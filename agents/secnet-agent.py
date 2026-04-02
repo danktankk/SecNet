@@ -10,11 +10,6 @@ Usage (run as Administrator):
   secnet-agent.exe setup  --url http://SECNET:8088 --key YOUR_KEY
   secnet-agent.exe install
   secnet-agent.exe start
-
-The EXE copies itself to C:\\Program Files\\SecNet\\secnet-agent.exe on install.
-Config lives at C:\\ProgramData\\SecNet\\agent.json.
-Logs go to C:\\ProgramData\\SecNet\\agent.log.
-Service name: SecNetAgent (visible in services.msc).
 """
 import argparse
 import json
@@ -73,24 +68,56 @@ def save_config(cfg: dict):
         json.dump(cfg, f, indent=2)
 
 
-# ── PowerShell helper ─────────────────────────────────────
+# ── Cached values (computed once, not every cycle) ────────
 
-def _ps(command: str, timeout: int = 15) -> str | None:
-    """Run a PowerShell command, return stdout or None on failure.
-    Uses pwsh (PowerShell 7) if available, falls back to powershell (5.1)."""
-    for shell in ('pwsh', 'powershell'):
+_cached_domain: str | None = None
+_cached_os_version: str | None = None
+
+
+def get_os_version():
+    global _cached_os_version
+    if _cached_os_version:
+        return _cached_os_version
+    release = platform.release()
+    version = platform.version()
+    build = 0
+    try:
+        build = int(version.split('.')[-1]) if version else 0
+    except ValueError:
+        pass
+    name = 'Windows 11' if release == '10' and build >= 22000 else f'Windows {release}'
+    _cached_os_version = f"{name} ({version[:20]})"
+    return _cached_os_version
+
+
+def get_domain():
+    """Get AD domain. Cached — domain doesn't change at runtime."""
+    global _cached_domain
+    if _cached_domain is not None:
+        return _cached_domain
+    # Try native Python first (no subprocess)
+    try:
+        import ctypes
+        buf = ctypes.create_unicode_buffer(256)
+        size = ctypes.c_ulong(256)
+        ctypes.windll.kernel32.GetComputerNameExW(2, buf, ctypes.byref(size))  # 2 = ComputerNameDnsDomain
+        if buf.value:
+            _cached_domain = buf.value
+            return _cached_domain
+    except Exception:
+        pass
+    # Fallback: WMI via PowerShell (one-time only)
+    for cmd in ('(Get-CimInstance Win32_ComputerSystem).Domain', '(Get-WmiObject Win32_ComputerSystem).Domain'):
         try:
-            r = subprocess.run(
-                [shell, '-NonInteractive', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command],
-                capture_output=True, text=True, timeout=timeout,
-            )
+            r = subprocess.run(['powershell', '-NonInteractive', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', cmd],
+                               capture_output=True, text=True, timeout=5)
             if r.returncode == 0 and r.stdout.strip():
-                return r.stdout.strip()
-        except FileNotFoundError:
-            continue
+                _cached_domain = r.stdout.strip()
+                return _cached_domain
         except Exception:
             continue
-    return None
+    _cached_domain = ''
+    return _cached_domain
 
 
 # ── Collection ────────────────────────────────────────────
@@ -137,12 +164,62 @@ def get_processes():
     return procs[:MAX_PROCS]
 
 
-def get_events_powershell():
-    """Fetch Windows Security Event Log. Works on Win10 and Win11."""
+def get_events_native():
+    """Read Windows Security Event Log using win32evtlog (no PowerShell subprocess)."""
+    try:
+        import win32evtlog
+        import win32evtlogutil
+    except ImportError:
+        return _get_events_powershell_fallback()
+
+    try:
+        hand = win32evtlog.OpenEventLog(None, 'Security')
+    except Exception:
+        return _get_events_powershell_fallback()
+
+    events = []
+    flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
+    seen = 0
+    max_scan = 200  # scan at most 200 events looking for our IDs
+
+    try:
+        while seen < max_scan and len(events) < MAX_EVENTS:
+            records = win32evtlog.ReadEventLog(hand, flags, 0)
+            if not records:
+                break
+            for ev in records:
+                seen += 1
+                if seen > max_scan:
+                    break
+                eid = ev.EventID & 0xFFFF  # mask to 16-bit
+                if eid not in SECURITY_EVENT_IDS:
+                    continue
+                t = ev.TimeGenerated.strftime('%H:%M:%S') if ev.TimeGenerated else ''
+                # Build message from string inserts
+                msg = ''
+                try:
+                    msg = win32evtlogutil.SafeFormatMessage(ev, 'Security')
+                    msg = msg.split('\n')[0][:120].strip()
+                except Exception:
+                    msg = f'Event {eid}'
+                level = 'critical' if eid in {4648, 4703, 4704} else 'warn' if eid == 4625 else 'info'
+                events.append({'id': eid, 'level': level, 'time': t, 'msg': msg})
+                if len(events) >= MAX_EVENTS:
+                    break
+    except Exception as e:
+        log.warning(f'Native event log read failed: {e}')
+    finally:
+        try:
+            win32evtlog.CloseEventLog(hand)
+        except Exception:
+            pass
+
+    return events
+
+
+def _get_events_powershell_fallback():
+    """Fallback if win32evtlog isn't available."""
     ids = ','.join(str(i) for i in SECURITY_EVENT_IDS)
-    # Get-WinEvent works on both Win10 and Win11 (it's the modern API).
-    # -ErrorAction SilentlyContinue handles the case where Security log
-    # requires elevation — returns empty instead of crashing.
     ps = (
         f"Get-WinEvent -LogName Security -MaxEvents 100 -ErrorAction SilentlyContinue | "
         f"Where-Object {{$_.Id -in @({ids})}} | "
@@ -150,17 +227,19 @@ def get_events_powershell():
         f"ConvertTo-Json -Compress"
     )
     try:
-        out = _ps(ps)
-        if not out:
+        r = subprocess.run(
+            ['powershell', '-NonInteractive', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps],
+            capture_output=True, text=True, timeout=15,
+        )
+        if r.returncode != 0 or not r.stdout.strip():
             return []
-        raw = json.loads(out)
+        raw = json.loads(r.stdout)
         if isinstance(raw, dict):
             raw = [raw]
         events = []
         for ev in raw:
             eid = ev.get('Id', 0)
             ts = ev.get('TimeCreated', {})
-            # TimeCreated can be a dict with /Date()/ or an ISO string
             ts_str = ''
             if isinstance(ts, dict):
                 ts_str = ts.get('value', ts.get('Value', ts.get('DateTime', '')))
@@ -176,36 +255,8 @@ def get_events_powershell():
             events.append({'id': eid, 'level': level, 'time': t, 'msg': msg})
         return events
     except Exception as e:
-        log.warning(f'Event log fetch failed: {e}')
+        log.warning(f'PowerShell event log fallback failed: {e}')
         return []
-
-
-def get_domain():
-    """Get AD domain. Uses Get-CimInstance (Win11) with Get-WmiObject fallback (Win10)."""
-    # Try CIM first (works on Win10+, required on Win11 where WMI cmdlets removed)
-    out = _ps('(Get-CimInstance Win32_ComputerSystem).Domain', timeout=5)
-    if out:
-        return out
-    # Fallback for older systems
-    out = _ps('(Get-WmiObject Win32_ComputerSystem).Domain', timeout=5)
-    return out or ''
-
-
-def get_os_version():
-    """Return a human-readable OS string. Handles Win11 build number detection."""
-    release = platform.release()       # "10" for both Win10 and Win11
-    version = platform.version()       # "10.0.22631" etc.
-    build = 0
-    try:
-        build = int(version.split('.')[-1]) if version else 0
-    except ValueError:
-        pass
-    # Windows 11 is build 22000+, but platform.release() still says "10"
-    if release == '10' and build >= 22000:
-        name = 'Windows 11'
-    else:
-        name = f'Windows {release}'
-    return f"{name} ({version[:20]})"
 
 
 def collect():
@@ -222,7 +273,7 @@ def collect():
         'user': user, 'session_start': session_start,
         'cpu': int(cpu), 'ram': int(mem.percent), 'disk': int(disk.percent),
         'processes': get_processes(),
-        'events': get_events_powershell(),
+        'events': get_events_native(),
     }
 
 
@@ -329,7 +380,7 @@ def cmd_setup(args):
         print(f'  Connection: {"OK" if r.status_code == 200 else f"HTTP {r.status_code}"}')
     except Exception as e:
         print(f'  Connection: FAILED ({e})')
-    print(f'  OS detected: {get_os_version()}')
+    print(f'  OS: {get_os_version()}')
 
 
 def cmd_install(args):
@@ -347,7 +398,6 @@ def cmd_install(args):
         shutil.copy2(src, INSTALL_EXE)
         print(f'Copied to {INSTALL_EXE}')
 
-    # Use sc.exe — works reliably with frozen PyInstaller exes on Win10/11
     subprocess.run([
         'sc', 'create', SERVICE_NAME,
         f'binPath={INSTALL_EXE} --run-service',
@@ -366,7 +416,6 @@ def cmd_remove(args):
     time.sleep(2)
     subprocess.run(['sc', 'delete', SERVICE_NAME], check=True)
     print(f'Service "{SERVICE_NAME}" removed')
-    # Optionally clean up installed exe
     if os.path.exists(INSTALL_EXE):
         try:
             os.remove(INSTALL_EXE)

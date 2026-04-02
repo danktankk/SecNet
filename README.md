@@ -1,5 +1,7 @@
 # SecNet
 
+Not yet ready.  Use at your own risk.
+
 Real-time security and network operations dashboard for homelabs. One screen to monitor everything: firewall bans, network devices, hypervisor health, endpoint status, and event logs.
 
 SecNet pulls live data from CrowdSec, UniFi, Proxmox, Loki, and Prometheus, then presents it in a single tabbed interface. An OpenAI-powered HelpDesk lets you ask questions about your infrastructure without leaving the dashboard.

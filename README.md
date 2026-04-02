@@ -12,7 +12,7 @@ All integrations are optional. If a service is not configured, its tab hides aut
 Threat level, active bans, attacker geo-map (color coded for mitigated/threat), ban trends, attack breakdown by type and severity.
 
 <p align="center">
-  <img src="docs/screenshots/mock-1-security.png" width="100%">
+  <img src="docs/screenshots/mock-1-security.png">
 </p>
 
 ### Infrastructure

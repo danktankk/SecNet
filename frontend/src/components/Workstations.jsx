@@ -79,7 +79,7 @@ function WorkstationCard({ ws }) {
           <span className="ws-session text-muted">Session: {formatSessionTime(ws.session_start)}</span>
           <span className="ws-lastseen text-muted">Seen: {formatLastSeen(ws.last_seen)}</span>
           <span className="ws-ip mono text-muted">{ws.ip}</span>
-          <span className="ws-expand-icon">{expanded ? '▲' : '▼'}</span>
+          <span className="ws-expand-icon">{expanded ? '\u25B2' : '\u25BC'}</span>
         </div>
       </div>
 
@@ -92,9 +92,9 @@ function WorkstationCard({ ws }) {
       <div className="ws-system-bar">
         <div className="ws-detail-info-inline">
           <span><span className="text-muted">OS:</span> {ws.os}</span>
-          <span className="ws-sys-sep">·</span>
-          <span><span className="text-muted">Domain:</span> {ws.domain || '—'}</span>
-          <span className="ws-sys-sep">·</span>
+          <span className="ws-sys-sep">{'\u00B7'}</span>
+          <span><span className="text-muted">Domain:</span> {ws.domain || '\u2014'}</span>
+          <span className="ws-sys-sep">{'\u00B7'}</span>
           <span><span className="text-muted">MAC:</span> <span className="mono">{ws.mac}</span></span>
         </div>
         <div className="ws-bars-inline">
@@ -106,23 +106,27 @@ function WorkstationCard({ ws }) {
 
       {expanded && (
         <div className="ws-card-body">
-          <div className="ws-detail-row">
-            <div className="ws-col">
+          <div className="ws-detail-split">
+            <div className="ws-detail-procs">
               <div className="ws-section-label">Processes ({ws.processes.length})</div>
               <div className="ws-proc-table">
                 <div className="ws-proc-header">
                   <span>Name</span><span>PID</span><span>CPU</span><span>RAM</span><span>Flags</span>
                 </div>
-                {ws.processes.map(p => <ProcessRow key={p.pid} proc={p} />)}
+                <div className="ws-proc-scroll">
+                  {ws.processes.map(p => <ProcessRow key={p.pid} proc={p} />)}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="ws-section-label" style={{ marginTop: '12px' }}>Event Log</div>
-          <div className="ws-event-log">
-            {ws.events.length > 0
-              ? ws.events.map((ev, i) => <EventRow key={i} ev={ev} />)
-              : <div className="text-muted" style={{padding:'8px'}}>No security events captured yet.</div>
-            }
+            <div className="ws-detail-events">
+              <div className="ws-section-label">Security Events ({ws.events.length})</div>
+              <div className="ws-event-log">
+                {ws.events.length > 0
+                  ? ws.events.map((ev, i) => <EventRow key={i} ev={ev} />)
+                  : <div className="text-muted" style={{padding:'8px'}}>No security events captured yet.</div>
+                }
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -149,15 +153,11 @@ export default function Workstations() {
     return (
       <div className="workstations">
         <div className="ws-header">
-          <h3>Windows Workstations</h3>
+          <h3>Workstations</h3>
         </div>
         <div className="panel" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
           No workstations reporting yet.<br /><br />
-          Run the agent on your Windows machine:<br />
-          <code style={{ display: 'block', marginTop: '12px', fontSize: '0.85rem' }}>
-            pip install psutil requests<br />
-            python secnet-agent.py --url http://SECNET_HOST:8088 --key YOUR_AGENT_KEY
-          </code>
+          Download the agent from the GitHub release and run it on your machines.
         </div>
       </div>
     )
@@ -166,7 +166,7 @@ export default function Workstations() {
   return (
     <div className="workstations">
       <div className="ws-header">
-        <h3>Windows Workstations — Live</h3>
+        <h3>Workstations {'\u2014'} Live</h3>
       </div>
       <div className="ws-filter-bar">
         {[

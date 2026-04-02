@@ -2,7 +2,7 @@
   <img src="https://img.shields.io/badge/status-alpha-red" />
   <img src="https://img.shields.io/badge/docker-compose-blue" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" />
-  <img src="https://img.shields.io/badge/any_text-agents_:_win_linux_mac-green" />
+  <img src="https://img.shields.io/badge/agents_:_win_linux_mac-8A2BE2" />
 </p>
 
 # SecNet

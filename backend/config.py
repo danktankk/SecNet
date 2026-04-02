@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # Database path
     secnet_db: str = "/data/secnet.db"
 
+    workstation_agent_key: str = ""
+    enable_workstations: bool = True
+
     # Feature flags — set to false to disable a data source entirely.
     # Disabled services return empty data; their tabs hide in the UI.
     enable_crowdsec: bool = True

@@ -17,7 +17,7 @@ const ALL_TABS = [
   { id: 'security',       label: 'Security',       icon: '⬡', feature: 'crowdsec' },
   { id: 'infrastructure', label: 'Infrastructure',  icon: '⬢', feature: 'proxmox' },
   { id: 'network',        label: 'Network',         icon: '◈', feature: 'unifi' },
-  { id: 'workstations',   label: 'Workstations',    icon: '◻', feature: null },
+  { id: 'workstations',   label: 'Workstations',    icon: '◻', feature: 'workstations' },
   { id: 'logs',           label: 'Logs',            icon: '▤', feature: 'crowdsec' },
 ]
 

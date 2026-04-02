@@ -37,6 +37,40 @@ def init_db() -> None:
                 ip       TEXT NOT NULL DEFAULT ''
             );
         """)
+
+            CREATE TABLE IF NOT EXISTS workstations (
+                id           TEXT PRIMARY KEY,
+                hostname     TEXT NOT NULL,
+                ip           TEXT NOT NULL DEFAULT '',
+                mac          TEXT NOT NULL DEFAULT '',
+                os           TEXT NOT NULL DEFAULT '',
+                domain       TEXT NOT NULL DEFAULT '',
+                ws_user      TEXT NOT NULL DEFAULT '',
+                session_start INTEGER NOT NULL DEFAULT 0,
+                cpu          INTEGER NOT NULL DEFAULT 0,
+                ram          INTEGER NOT NULL DEFAULT 0,
+                disk         INTEGER NOT NULL DEFAULT 0,
+                status       TEXT NOT NULL DEFAULT 'healthy',
+                alerts       TEXT NOT NULL DEFAULT '[]',
+                last_seen    INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS workstation_processes (
+                id    INTEGER PRIMARY KEY AUTOINCREMENT,
+                ws_id TEXT NOT NULL,
+                name  TEXT NOT NULL,
+                pid   INTEGER NOT NULL,
+                cpu   REAL NOT NULL DEFAULT 0,
+                ram   INTEGER NOT NULL DEFAULT 0,
+                flags TEXT NOT NULL DEFAULT '[]'
+            );
+            CREATE TABLE IF NOT EXISTS workstation_events (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                ws_id    TEXT NOT NULL,
+                event_id INTEGER NOT NULL,
+                level    TEXT NOT NULL DEFAULT 'info',
+                ev_time  TEXT NOT NULL,
+                msg      TEXT NOT NULL
+            );
         conn.commit()
     finally:
         conn.close()

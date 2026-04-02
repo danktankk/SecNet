@@ -89,22 +89,24 @@ function WorkstationCard({ ws }) {
         </div>
       )}
 
+      <div className="ws-system-bar">
+        <div className="ws-detail-info-inline">
+          <span><span className="text-muted">OS:</span> {ws.os}</span>
+          <span className="ws-sys-sep">·</span>
+          <span><span className="text-muted">Domain:</span> {ws.domain || '—'}</span>
+          <span className="ws-sys-sep">·</span>
+          <span><span className="text-muted">MAC:</span> <span className="mono">{ws.mac}</span></span>
+        </div>
+        <div className="ws-bars-inline">
+          <UsageBar value={ws.cpu} label="CPU" />
+          <UsageBar value={ws.ram} label="RAM" warn={75} danger={90} />
+          <UsageBar value={ws.disk} label="Disk" warn={80} danger={95} />
+        </div>
+      </div>
+
       {expanded && (
         <div className="ws-card-body">
           <div className="ws-detail-row">
-            <div className="ws-col">
-              <div className="ws-section-label">System</div>
-              <div className="ws-detail-info">
-                <div><span className="text-muted">OS:</span> {ws.os}</div>
-                <div><span className="text-muted">Domain:</span> {ws.domain || '—'}</div>
-                <div><span className="text-muted">MAC:</span> <span className="mono">{ws.mac}</span></div>
-              </div>
-              <div className="ws-bars">
-                <UsageBar value={ws.cpu} label="CPU" />
-                <UsageBar value={ws.ram} label="RAM" warn={75} danger={90} />
-                <UsageBar value={ws.disk} label="Disk" warn={80} danger={95} />
-              </div>
-            </div>
             <div className="ws-col">
               <div className="ws-section-label">Processes ({ws.processes.length})</div>
               <div className="ws-proc-table">

@@ -415,6 +415,10 @@ body {
 .ws-detail-info span.text-muted { margin-right: 6px; }
 
 .ws-bars { display: flex; flex-direction: column; gap: 6px; }
+.ws-system-bar { padding: 8px 14px 10px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.ws-detail-info-inline { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.82rem; color: var(--text); }
+.ws-sys-sep { color: var(--border); }
+.ws-bars-inline { display: flex; gap: 16px; flex-wrap: wrap; }
 .ws-bar-wrap { display: flex; align-items: center; gap: 8px; }
 .ws-bar-label { font-size: 0.72rem; color: var(--text-muted); width: 32px; text-align: right; flex-shrink: 0; }
 .ws-bar-track { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }

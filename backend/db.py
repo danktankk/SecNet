@@ -8,12 +8,10 @@ from typing import Any
 
 _DB_PATH = os.environ.get("SECNET_DB", "/data/secnet.db")
 
-
 _initialized = False
 
 
 def init_db() -> None:
-    """Create tables if they don't exist. Call once at startup."""
     global _initialized
     if _initialized:
         return
@@ -36,23 +34,21 @@ def init_db() -> None:
                 hostname TEXT NOT NULL UNIQUE,
                 ip       TEXT NOT NULL DEFAULT ''
             );
-        """)
-
             CREATE TABLE IF NOT EXISTS workstations (
-                id           TEXT PRIMARY KEY,
-                hostname     TEXT NOT NULL,
-                ip           TEXT NOT NULL DEFAULT '',
-                mac          TEXT NOT NULL DEFAULT '',
-                os           TEXT NOT NULL DEFAULT '',
-                domain       TEXT NOT NULL DEFAULT '',
-                ws_user      TEXT NOT NULL DEFAULT '',
+                id            TEXT PRIMARY KEY,
+                hostname      TEXT NOT NULL,
+                ip            TEXT NOT NULL DEFAULT '',
+                mac           TEXT NOT NULL DEFAULT '',
+                os            TEXT NOT NULL DEFAULT '',
+                domain        TEXT NOT NULL DEFAULT '',
+                ws_user       TEXT NOT NULL DEFAULT '',
                 session_start INTEGER NOT NULL DEFAULT 0,
-                cpu          INTEGER NOT NULL DEFAULT 0,
-                ram          INTEGER NOT NULL DEFAULT 0,
-                disk         INTEGER NOT NULL DEFAULT 0,
-                status       TEXT NOT NULL DEFAULT 'healthy',
-                alerts       TEXT NOT NULL DEFAULT '[]',
-                last_seen    INTEGER NOT NULL DEFAULT 0
+                cpu           INTEGER NOT NULL DEFAULT 0,
+                ram           INTEGER NOT NULL DEFAULT 0,
+                disk          INTEGER NOT NULL DEFAULT 0,
+                status        TEXT NOT NULL DEFAULT 'healthy',
+                alerts        TEXT NOT NULL DEFAULT '[]',
+                last_seen     INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS workstation_processes (
                 id    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,6 +67,7 @@ def init_db() -> None:
                 ev_time  TEXT NOT NULL,
                 msg      TEXT NOT NULL
             );
+        """)
         conn.commit()
     finally:
         conn.close()
@@ -85,7 +82,6 @@ def _connect() -> sqlite3.Connection:
 
 
 def get_host_registry() -> list[dict[str, Any]]:
-    """Return all rows from the hosts table as dicts matching the old HOST_REGISTRY format."""
     conn = _connect()
     try:
         rows = conn.execute(
@@ -112,7 +108,6 @@ def get_host_registry() -> list[dict[str, Any]]:
 
 
 def lookup_known_ip(hostname: str) -> str:
-    """Look up a hostname in the known_ips table. Returns empty string if not found."""
     conn = _connect()
     try:
         row = conn.execute(

@@ -1,31 +1,25 @@
 #!/usr/bin/env python3
 """
-SecNet Windows Agent
-Collects system stats, processes, and event log entries,
-then POSTs to the SecNet dashboard every 30 seconds.
+SecNet Windows Agent — standalone EXE that installs as a Windows Service.
 
-Can run standalone (console) or as a Windows Service.
+Build:  pip install pyinstaller psutil requests pywin32
+        pyinstaller --onefile --name secnet-agent --hidden-import=win32timezone secnet-agent.py
 
-Requirements: pip install psutil requests pywin32
+Usage (run as Administrator):
+  secnet-agent.exe setup  --url http://SECNET:8088 --key YOUR_KEY
+  secnet-agent.exe install
+  secnet-agent.exe start
 
-Setup:
-  1. python secnet-agent.py setup --url http://SECNET:8088 --key YOUR_KEY
-  2. python secnet-agent.py install
-  3. python secnet-agent.py start
-
-Commands:
-  setup   — create config file (C:\\ProgramData\\SecNet\\agent.json)
-  install — install as Windows service (requires admin)
-  start   — start the service
-  stop    — stop the service
-  remove  — uninstall the service
-  run     — run in console (foreground, for testing)
-  status  — show config and service status
+The EXE copies itself to C:\\Program Files\\SecNet\\secnet-agent.exe on install.
+Config lives at C:\\ProgramData\\SecNet\\agent.json.
+Logs go to C:\\ProgramData\\SecNet\\agent.log.
+Service name: SecNetAgent (visible in services.msc).
 """
 import argparse
 import json
 import os
 import platform
+import shutil
 import socket
 import subprocess
 import sys
@@ -35,11 +29,13 @@ import logging
 import psutil
 import requests
 
-# ── Config ────────────────────────────────────────────────
+# ── Paths ─────────────────────────────────────────────────
 
+PROGRAM_DIR = os.path.join(os.environ.get('PROGRAMFILES', 'C:\\Program Files'), 'SecNet')
 CONFIG_DIR = os.path.join(os.environ.get('PROGRAMDATA', 'C:\\ProgramData'), 'SecNet')
 CONFIG_FILE = os.path.join(CONFIG_DIR, 'agent.json')
 LOG_FILE = os.path.join(CONFIG_DIR, 'agent.log')
+INSTALL_EXE = os.path.join(PROGRAM_DIR, 'secnet-agent.exe')
 SERVICE_NAME = 'SecNetAgent'
 SERVICE_DISPLAY = 'SecNet Monitoring Agent'
 SERVICE_DESC = 'Reports workstation health and security events to SecNet dashboard'
@@ -49,8 +45,18 @@ MAX_PROCS = 40
 MAX_EVENTS = 30
 SECURITY_EVENT_IDS = {4624, 4625, 4648, 4688, 4703, 4704, 4776, 4800, 4801, 5156, 7045}
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
-log = logging.getLogger('secnet-agent')
+
+def _setup_logging(to_file=False):
+    handlers = [logging.StreamHandler()]
+    if to_file:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        handlers.append(logging.FileHandler(LOG_FILE))
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s',
+                        handlers=handlers, force=True)
+    return logging.getLogger('secnet-agent')
+
+
+log = _setup_logging()
 
 
 def load_config() -> dict:
@@ -176,7 +182,6 @@ def report(url, key, payload):
 # ── Agent loop ────────────────────────────────────────────
 
 def agent_loop(url: str, key: str, stop_event=None):
-    """Main collection loop. Runs until stop_event is set (service) or forever (console)."""
     log.info(f'SecNet agent starting — reporting to {url} every {INTERVAL}s')
     while True:
         if stop_event and stop_event.is_set():
@@ -187,23 +192,14 @@ def agent_loop(url: str, key: str, stop_event=None):
             log.info(f'Reported {payload["hostname"]} — status: {resp.get("status","?")}')
         except Exception as e:
             log.error(f'Report failed: {e}')
-        # Sleep in small increments so we can respond to stop quickly
         for _ in range(INTERVAL):
             if stop_event and stop_event.is_set():
                 break
             time.sleep(1)
+    log.info('SecNet agent stopped')
 
 
 # ── Windows Service ───────────────────────────────────────
-
-def _import_win32():
-    """Import win32 modules — only needed for service operations."""
-    import win32serviceutil
-    import win32service
-    import win32event
-    import servicemanager
-    return win32serviceutil, win32service, win32event, servicemanager
-
 
 try:
     import win32serviceutil
@@ -219,19 +215,15 @@ try:
         def __init__(self, args):
             win32serviceutil.ServiceFramework.__init__(self, args)
             self.stop_event = win32event.CreateEvent(None, 0, 0, None)
-            self._stop = False
 
         def SvcStop(self):
             self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
-            self._stop = True
             win32event.SetEvent(self.stop_event)
 
         def SvcDoRun(self):
             import threading
-            # Set up file logging for service mode
-            fh = logging.FileHandler(LOG_FILE)
-            fh.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
-            logging.getLogger().addHandler(fh)
+            global log
+            log = _setup_logging(to_file=True)
 
             servicemanager.LogMsg(servicemanager.EVENTLOG_INFORMATION_TYPE,
                                   servicemanager.PYS_SERVICE_STARTED,
@@ -241,20 +233,17 @@ try:
             url = cfg.get('url', '')
             key = cfg.get('key', '')
             if not url or not key:
-                log.error(f'No config found at {CONFIG_FILE}. Run: secnet-agent setup --url URL --key KEY')
-                servicemanager.LogErrorMsg(f'SecNet agent missing config at {CONFIG_FILE}')
+                log.error(f'No config at {CONFIG_FILE}. Run: secnet-agent setup --url URL --key KEY')
                 return
 
             stop_evt = threading.Event()
 
-            def _watch_stop():
+            def _watch():
                 win32event.WaitForSingleObject(self.stop_event, win32event.INFINITE)
                 stop_evt.set()
 
-            t = threading.Thread(target=_watch_stop, daemon=True)
-            t.start()
+            threading.Thread(target=_watch, daemon=True).start()
             agent_loop(url, key, stop_event=stop_evt)
-            log.info('SecNet agent stopped')
 
     HAS_WIN32 = True
 except ImportError:
@@ -263,6 +252,13 @@ except ImportError:
 
 # ── CLI Commands ──────────────────────────────────────────
 
+def _exe_path():
+    """Return the path to this exe (or script if running from source)."""
+    if getattr(sys, 'frozen', False):
+        return sys.executable
+    return os.path.abspath(__file__)
+
+
 def cmd_setup(args):
     cfg = load_config()
     if args.url:
@@ -270,48 +266,98 @@ def cmd_setup(args):
     if args.key:
         cfg['key'] = args.key
     if not cfg.get('url') or not cfg.get('key'):
-        print('ERROR: --url and --key are required (or must already be in config)')
+        print('ERROR: --url and --key are required')
         sys.exit(1)
     save_config(cfg)
     print(f'Config saved to {CONFIG_FILE}')
     print(f'  URL: {cfg["url"]}')
     print(f'  Key: {cfg["key"][:8]}...')
-    # Quick connectivity test
     try:
         r = requests.get(f'{cfg["url"]}/api/health', timeout=5)
-        if r.status_code == 200:
-            print(f'  Connection test: OK')
-        else:
-            print(f'  Connection test: HTTP {r.status_code}')
+        print(f'  Connection: {"OK" if r.status_code == 200 else f"HTTP {r.status_code}"}')
     except Exception as e:
-        print(f'  Connection test: FAILED ({e})')
+        print(f'  Connection: FAILED ({e})')
+
+
+def cmd_install(args):
+    if not HAS_WIN32:
+        print('ERROR: pywin32 required (should be bundled in the exe)')
+        sys.exit(1)
+    cfg = load_config()
+    if not cfg.get('url') or not cfg.get('key'):
+        print('ERROR: Run setup first: secnet-agent setup --url URL --key KEY')
+        sys.exit(1)
+
+    # Copy exe to Program Files
+    src = _exe_path()
+    os.makedirs(PROGRAM_DIR, exist_ok=True)
+    if os.path.normpath(src) != os.path.normpath(INSTALL_EXE):
+        shutil.copy2(src, INSTALL_EXE)
+        print(f'Copied to {INSTALL_EXE}')
+
+    # Install the service pointing to the installed exe
+    # sc create is more reliable than win32serviceutil for frozen exes
+    subprocess.run([
+        'sc', 'create', SERVICE_NAME,
+        f'binPath={INSTALL_EXE} --run-service',
+        f'DisplayName={SERVICE_DISPLAY}',
+        'start=auto',
+    ], check=True)
+    subprocess.run(['sc', 'description', SERVICE_NAME, SERVICE_DESC], check=True)
+    # Set restart on failure: restart after 10s, 30s, 60s
+    subprocess.run(['sc', 'failure', SERVICE_NAME, 'reset=86400', 'actions=restart/10000/restart/30000/restart/60000'], check=True)
+    print(f'Service "{SERVICE_NAME}" installed')
+    print(f'Start with: secnet-agent start  (or net start {SERVICE_NAME})')
+
+
+def cmd_remove(args):
+    subprocess.run(['sc', 'stop', SERVICE_NAME], capture_output=True)
+    time.sleep(2)
+    subprocess.run(['sc', 'delete', SERVICE_NAME], check=True)
+    print(f'Service "{SERVICE_NAME}" removed')
+
+
+def cmd_start(args):
+    subprocess.run(['sc', 'start', SERVICE_NAME], check=True)
+    print(f'Service starting...')
+    time.sleep(2)
+    result = subprocess.run(['sc', 'query', SERVICE_NAME], capture_output=True, text=True)
+    if 'RUNNING' in result.stdout:
+        print('Service is RUNNING')
+    else:
+        print('Service may still be starting — check: secnet-agent status')
+
+
+def cmd_stop(args):
+    subprocess.run(['sc', 'stop', SERVICE_NAME], check=True)
+    print('Service stopped')
 
 
 def cmd_status(args):
     cfg = load_config()
     if cfg:
-        print(f'Config: {CONFIG_FILE}')
-        print(f'  URL: {cfg.get("url", "(not set)")}')
-        print(f'  Key: {cfg.get("key", "(not set)")[:8]}...' if cfg.get('key') else '  Key: (not set)')
+        print(f'Config:  {CONFIG_FILE}')
+        print(f'  URL:   {cfg.get("url", "(not set)")}')
+        print(f'  Key:   {cfg.get("key", "")[:8]}...' if cfg.get('key') else '  Key:   (not set)')
     else:
-        print(f'No config found at {CONFIG_FILE}')
-        print(f'Run: secnet-agent setup --url http://SECNET:8088 --key YOUR_KEY')
+        print(f'Config:  NOT FOUND at {CONFIG_FILE}')
     print()
-    if HAS_WIN32:
-        try:
-            status = win32serviceutil.QueryServiceStatus(SERVICE_NAME)
-            state_map = {1: 'STOPPED', 2: 'START_PENDING', 3: 'STOP_PENDING', 4: 'RUNNING'}
-            print(f'Service: {state_map.get(status[1], f"UNKNOWN ({status[1]})")}')
-        except Exception:
-            print('Service: NOT INSTALLED')
+    result = subprocess.run(['sc', 'query', SERVICE_NAME], capture_output=True, text=True)
+    if result.returncode == 0:
+        for line in result.stdout.strip().splitlines():
+            line = line.strip()
+            if 'STATE' in line or 'SERVICE_NAME' in line:
+                print(f'  {line}')
     else:
-        print('Service: pywin32 not installed (pip install pywin32)')
-    if os.path.exists(LOG_FILE):
-        print(f'Log: {LOG_FILE}')
+        print('Service: NOT INSTALLED')
+    print()
+    print(f'Exe:     {INSTALL_EXE}  {"(exists)" if os.path.exists(INSTALL_EXE) else "(not found)"}')
+    print(f'Log:     {LOG_FILE}  {"(exists)" if os.path.exists(LOG_FILE) else "(not found)"}')
 
 
 def cmd_run(args):
-    """Run in console (foreground) for testing."""
+    global log
+    log = _setup_logging(to_file=False)
     cfg = load_config()
     url = args.url or cfg.get('url', '')
     key = args.key or cfg.get('key', '')
@@ -321,104 +367,69 @@ def cmd_run(args):
     agent_loop(url, key)
 
 
-def cmd_install(args):
+def _run_as_service():
+    """Entry point when Windows SCM starts us with --run-service."""
     if not HAS_WIN32:
-        print('ERROR: pywin32 required. Run: pip install pywin32')
         sys.exit(1)
-    cfg = load_config()
-    if not cfg.get('url') or not cfg.get('key'):
-        print('ERROR: Run setup first: secnet-agent setup --url URL --key KEY')
-        sys.exit(1)
-    # Install the service pointing to this script
-    sys.argv = ['secnet-agent', 'install']
-    win32serviceutil.HandleCommandLine(SecNetService)
-
-
-def cmd_remove(args):
-    if not HAS_WIN32:
-        print('ERROR: pywin32 required.')
-        sys.exit(1)
-    sys.argv = ['secnet-agent', 'remove']
-    win32serviceutil.HandleCommandLine(SecNetService)
-
-
-def cmd_start(args):
-    if not HAS_WIN32:
-        print('ERROR: pywin32 required.')
-        sys.exit(1)
-    sys.argv = ['secnet-agent', 'start']
-    win32serviceutil.HandleCommandLine(SecNetService)
-
-
-def cmd_stop(args):
-    if not HAS_WIN32:
-        print('ERROR: pywin32 required.')
-        sys.exit(1)
-    sys.argv = ['secnet-agent', 'stop']
-    win32serviceutil.HandleCommandLine(SecNetService)
+    servicemanager.Initialize()
+    servicemanager.PrepareToHostSingle(SecNetService)
+    servicemanager.StartServiceCtrlDispatcher()
 
 
 def main():
+    # If SCM started us with --run-service, go straight to service mode
+    if '--run-service' in sys.argv:
+        _run_as_service()
+        return
+
     parser = argparse.ArgumentParser(
+        prog='secnet-agent',
         description='SecNet Workstation Agent',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Quick start:
+Quick start (run as Administrator):
   secnet-agent setup --url http://192.168.160.161:8088 --key YOUR_KEY
-  secnet-agent install     (run as admin)
-  secnet-agent start       (run as admin)
-  secnet-agent status      (check everything)
+  secnet-agent install
+  secnet-agent start
+  secnet-agent status
         """
     )
     sub = parser.add_subparsers(dest='command')
 
-    p_setup = sub.add_parser('setup', help='Create/update config file')
+    p_setup = sub.add_parser('setup', help='Save config (URL + key)')
     p_setup.add_argument('--url', help='SecNet dashboard URL')
     p_setup.add_argument('--key', help='Agent API key')
 
-    sub.add_parser('status', help='Show config and service status')
+    sub.add_parser('install', help='Install Windows service (admin)')
+    sub.add_parser('remove', help='Remove Windows service (admin)')
+    sub.add_parser('start', help='Start the service (admin)')
+    sub.add_parser('stop', help='Stop the service (admin)')
+    sub.add_parser('status', help='Show config + service status')
 
     p_run = sub.add_parser('run', help='Run in console (foreground)')
     p_run.add_argument('--url', default='')
     p_run.add_argument('--key', default='')
 
-    sub.add_parser('install', help='Install as Windows service (admin)')
-    sub.add_parser('remove', help='Remove Windows service (admin)')
-    sub.add_parser('start', help='Start the service (admin)')
-    sub.add_parser('stop', help='Stop the service (admin)')
-
-    # Legacy: support --url/--key without subcommand for backwards compat
+    # Legacy compat
     parser.add_argument('--url', default='', help=argparse.SUPPRESS)
     parser.add_argument('--key', default='', help=argparse.SUPPRESS)
     parser.add_argument('--once', action='store_true', help=argparse.SUPPRESS)
 
     args = parser.parse_args()
 
-    # Legacy mode: if --url and --key passed without subcommand
     if not args.command and (args.url and args.key):
-        log.info('Running in legacy mode (use "run" subcommand instead)')
         if args.once:
-            try:
-                payload = collect()
-                resp = report(args.url, args.key, payload)
-                print(json.dumps(resp))
-            except Exception as e:
-                print(f'ERROR: {e}', file=sys.stderr)
-                sys.exit(1)
+            payload = collect()
+            resp = report(args.url, args.key, payload)
+            print(json.dumps(resp))
         else:
             agent_loop(args.url, args.key)
         return
 
     commands = {
-        'setup': cmd_setup,
-        'status': cmd_status,
-        'run': cmd_run,
-        'install': cmd_install,
-        'remove': cmd_remove,
-        'start': cmd_start,
-        'stop': cmd_stop,
+        'setup': cmd_setup, 'install': cmd_install, 'remove': cmd_remove,
+        'start': cmd_start, 'stop': cmd_stop, 'status': cmd_status, 'run': cmd_run,
     }
-
     if args.command in commands:
         commands[args.command](args)
     else:

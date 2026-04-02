@@ -40,6 +40,8 @@ async def get_decisions() -> list[dict]:
     try:
         data = await crowdsec_get("/v1/decisions/stream", {"startup": "true"})
         return data.get("new") or []
+    except ValueError:
+        return []
     except Exception:
         logger.exception("Failed to fetch decisions")
         return []
@@ -48,6 +50,8 @@ async def get_decisions() -> list[dict]:
 async def get_alerts(since: str = "1h") -> list[dict]:
     try:
         return await crowdsec_get("/v1/alerts", {"since": since})
+    except ValueError:
+        return []
     except Exception:
         logger.exception("Failed to fetch alerts")
         return []
@@ -82,6 +86,8 @@ async def loki_query(query: str, limit: int = 100, since_ns: int | None = None) 
 
 
 async def loki_count(query: str, range_seconds: int = 86400) -> int:
+    if not settings.loki_url or not settings.enable_loki:
+        return 0
     c = await client()
     count_query = f'count_over_time({query}[{range_seconds}s])'
     try:

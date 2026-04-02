@@ -9,6 +9,7 @@ from services import hosts as hosts_svc
 from services import unifi
 from services import chat as chat_svc
 from services.data_layer import get_alerts
+from services import workstations as ws_svc
 from config import settings
 
 # ── Manual rate limiter for gate-check ───────────────────
@@ -52,6 +53,7 @@ async def features():
         "loki":       _status(settings.enable_loki, settings.loki_url),
         "prometheus": _status(settings.enable_prometheus, settings.prometheus_url),
         "openai":     _status(settings.enable_openai, settings.openai_api_key),
+        "workstations": _status(settings.enable_workstations, settings.workstation_agent_key),
     }
 
 
@@ -206,3 +208,32 @@ async def breakdown():
 @router.get("/threat-intel")
 async def threat_intel():
     return await aggregator.get_threat_intel()
+
+# ── Workstations ──────────────────────────────────────────
+
+class WorkstationReport(BaseModel):
+    hostname: str
+    ip: str = ""
+    mac: str = ""
+    os: str = ""
+    domain: str = ""
+    user: str = ""
+    session_start: int = 0
+    cpu: int = 0
+    ram: int = 0
+    disk: int = 0
+    processes: list[dict] = []
+    events: list[dict] = []
+
+
+@router.post("/workstations/report")
+async def workstation_report(report: WorkstationReport, x_agent_key: str = Header(default="")):
+    if not settings.workstation_agent_key or x_agent_key != settings.workstation_agent_key:
+        raise HTTPException(status_code=403, detail="Invalid agent key")
+    ws_svc.upsert_workstation(report.model_dump())
+    return {"status": "ok"}
+
+
+@router.get("/workstations")
+async def workstations():
+    return ws_svc.get_all()

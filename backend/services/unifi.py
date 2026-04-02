@@ -1,6 +1,7 @@
 """UniFi API client — clients, devices, and health."""
 
 from __future__ import annotations
+import asyncio
 import time
 import httpx
 from cachetools import TTLCache
@@ -9,6 +10,7 @@ from config import settings
 _cache: TTLCache = TTLCache(maxsize=10, ttl=60)
 _cookies: dict = {}
 _client: httpx.AsyncClient | None = None
+_login_lock: asyncio.Lock | None = None
 
 
 async def _get_client() -> httpx.AsyncClient:
@@ -19,8 +21,13 @@ async def _get_client() -> httpx.AsyncClient:
 
 
 async def _login() -> None:
-    global _cookies
-    c = await _get_client()
+    global _cookies, _login_lock
+    if _login_lock is None:
+        _login_lock = asyncio.Lock()
+    async with _login_lock:
+        if _cookies:  # another coroutine already logged in while we waited
+            return
+        c = await _get_client()
     r = await c.post(
         f"{settings.unifi_url}/api/auth/login",
         json={"username": settings.unifi_username, "password": settings.unifi_password},
@@ -30,6 +37,8 @@ async def _login() -> None:
 
 
 async def _get(path: str) -> list:
+    if not settings.unifi_url or not settings.enable_unifi:
+        return []
     global _cookies
     if not _cookies:
         await _login()

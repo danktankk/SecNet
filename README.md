@@ -11,40 +11,32 @@ All integrations are optional. If a service is not configured, its tab hides aut
 ### Security Overview
 Threat level, active bans, attacker geo-map, ban trends, attack breakdown by type and severity.
 
-![Security Tab](docs/screenshots/secnet-01-security.png)
+![Security Tab](docs/screenshots/mock-01-security.png)
 
 ### Infrastructure
 Host registry with live port checks, grouped by role. Proxmox hypervisor stats with CPU/RAM and guest counts. Gate-locked for sensitive operations.
 
-![Infrastructure Tab](docs/screenshots/secnet-02-infrastructure.png)
+![Infrastructure Tab](docs/screenshots/mock-02-infrastructure.png)
 
 ### Network Health
 Three-column layout: switches with port faceplate graphics, APs with radio utilization and client counts, intelligence panel with bandwidth hogs, weak WiFi signals, firmware alerts, and VLAN distribution.
 
-![Network Tab](docs/screenshots/secnet-03-network.png)
-
-Expand a switch to see the full port table with names, link speeds, and PoE wattage per port.
-
-![Network Expanded](docs/screenshots/secnet-03b-network-expanded.png)
+![Network Tab](docs/screenshots/mock-03-network.png)
 
 ### Workstations
 Windows endpoint monitoring with process lists, event logs, and security alerts. Ships with mock data by default -- wire to WinRM or an agent for live feeds.
 
-![Workstations Tab](docs/screenshots/secnet-04-workstations.png)
-
-Expand a workstation to see system details, running processes with flags, and the event log timeline.
-
-![Workstations Expanded](docs/screenshots/secnet-04b-workstations-expanded.png)
+![Workstations Tab](docs/screenshots/mock-04-workstations.png)
 
 ### Logs
 Four-panel feed: CrowdSec active bans, attack origins by country/ISP, UniFi events, and attack scenario breakdown.
 
-![Logs Tab](docs/screenshots/secnet-05-logs.png)
+![Logs Tab](docs/screenshots/mock-05-logs.png)
 
 ### AI HelpDesk
 OpenAI-powered security assistant. General questions work without auth. Sensitive data (IPs, bans, topology) requires gate credentials. Example prompts included.
 
-![HelpDesk](docs/screenshots/secnet-06-helpdesk.png)
+![HelpDesk](docs/screenshots/mock-06-helpdesk.png)
 
 ---
 

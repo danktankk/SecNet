@@ -1,3 +1,9 @@
+<p align="right">
+  <img src="https://img.shields.io/badge/status-alpha-red" />
+  <img src="https://img.shields.io/badge/docker-compose-blue" />
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" />
+</p>
+
 # SecNet
 
 > Not production ready.  While it is mostly read only, you should always review the code and be mindful of upstream dependencies.  Use at your own risk

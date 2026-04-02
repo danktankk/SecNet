@@ -1,6 +1,6 @@
 # SecNet
 
-Not yet ready.  Use at your own risk.
+**Not production ready.  While it is mostly read only, you should always review the code and be mindful of upstream dependencies.  Use at your own risk**
 
 Real-time security and network operations dashboard for homelabs. One screen to monitor everything: firewall bans, network devices, hypervisor health, endpoint status, and event logs.
 

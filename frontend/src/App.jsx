@@ -11,14 +11,15 @@ import NetworkHealth from './components/NetworkHealth'
 import Workstations from './components/Workstations'
 import SecurityBreakdown from './components/SecurityBreakdown'
 
-// Tabs that are always shown have feature: null.
-// Tabs with a feature string only show if that feature is enabled in /api/features.
+// feature: null = always shown
+// feature: string = show if that feature is enabled
+// feature: [string, ...] = show if ANY of those features are enabled
 const ALL_TABS = [
-  { id: 'security',       label: 'Security',       icon: '⬡', feature: 'crowdsec' },
-  { id: 'infrastructure', label: 'Infrastructure',  icon: '⬢', feature: 'proxmox' },
-  { id: 'network',        label: 'Network',         icon: '◈', feature: 'unifi' },
-  { id: 'workstations',   label: 'Workstations',    icon: '◻', feature: 'workstations' },
-  { id: 'logs',           label: 'Logs',            icon: '▤', feature: 'crowdsec' },
+  { id: 'security',       label: 'Security',       icon: '\u2B21', feature: null },
+  { id: 'infrastructure', label: 'Infrastructure',  icon: '\u2B22', feature: 'proxmox' },
+  { id: 'network',        label: 'Network',         icon: '\u25C8', feature: 'unifi' },
+  { id: 'workstations',   label: 'Workstations',    icon: '\u25FB', feature: 'workstations' },
+  { id: 'logs',           label: 'Logs',            icon: '\u25A4', feature: ['crowdsec', 'loki', 'unifi'] },
 ]
 
 const LEVEL_CONFIG = {
@@ -73,7 +74,7 @@ function ThreatBadge({ s }) {
         title={isActionable ? 'Click for details' : undefined}
       >
         {cfg.label}
-        {isActionable && <span style={{ marginLeft: 5, fontSize: '0.65rem', opacity: 0.7 }}>▼</span>}
+        {isActionable && <span style={{ marginLeft: 5, fontSize: '0.65rem', opacity: 0.7 }}>{'\u25BC'}</span>}
       </span>
 
       {open && isActionable && (
@@ -134,9 +135,7 @@ export default function App() {
     if (wsMsg?.type === 'summary') setLive(wsMsg.data)
   }, [wsMsg])
 
-  // Filter tabs based on which features are enabled.
-  // featuresData is null until loaded — show all tabs until we know.
-  // Each feature is either a bool (legacy) or {enabled, configured}.
+  // Check if a single feature key is enabled
   const featureEnabled = (key) => {
     if (!featuresData || !key) return true
     const v = featuresData[key]
@@ -144,29 +143,36 @@ export default function App() {
     if (typeof v === 'boolean') return v
     return v.enabled
   }
-  const featureConfigured = (key) => {
-    if (!featuresData || !key) return true
-    const v = featuresData[key]
-    if (v === undefined) return true
-    if (typeof v === 'boolean') return v
-    return v.configured
-  }
-  const visibleTabs = ALL_TABS.filter(t => t.feature === null || featureEnabled(t.feature))
 
-  // If current tab got hidden by feature flags, fall back to security
+  // Tab visibility: null = always, string = single feature, array = any-of
+  const tabVisible = (feature) => {
+    if (feature === null) return true
+    if (Array.isArray(feature)) return feature.some(f => featureEnabled(f))
+    return featureEnabled(feature)
+  }
+
+  const visibleTabs = ALL_TABS.filter(t => tabVisible(t.feature))
+
+  // If current tab got hidden by feature flags, fall back to first visible
   useEffect(() => {
     const ids = visibleTabs.map(t => t.id)
-    if (!ids.includes(tab)) setTab('security')
+    if (!ids.includes(tab)) setTab(ids[0] || 'security')
   }, [featuresData])
 
   const s = live || summary
   const now = s ? new Date(s.timestamp * 1000).toLocaleTimeString() : '--'
 
+  // Which data sources are live — used to conditionally render sections
+  const hasCrowdsec = featureEnabled('crowdsec')
+  const hasLoki = featureEnabled('loki')
+  const hasPrometheus = featureEnabled('prometheus')
+  const hasUnifi = featureEnabled('unifi')
+
   return (
     <div className="dashboard">
       {anyRefreshing && <div className="updating-bar" />}
       <div className="header">
-        <h1>Security Posture &amp; Network Operations · Real-Time Monitoring</h1>
+        <h1>Security Posture &amp; Network Operations {'\u00B7'} Real-Time Monitoring</h1>
         <div className="meta">
           <span>Last update: {now}{anyRefreshing && <span className="updating-dot" />}</span>
           <ThreatBadge s={s} />
@@ -186,7 +192,7 @@ export default function App() {
       {featureEnabled('openai') && <AiChat />}
 
       <div className="tab-bar">
-        <span className="tab-bar-label">◉ VIEW</span>
+        <span className="tab-bar-label">{'\u25C9'} VIEW</span>
         <div className="tab-bar-divider" />
         {visibleTabs.map(t => (
           <button
@@ -202,19 +208,28 @@ export default function App() {
 
       {tab === 'security' && (
         <>
-          <StatCards summary={s} />
-          <ThreatIntel />
+          {(hasCrowdsec || hasPrometheus) && <StatCards summary={s} />}
+          {hasCrowdsec && <ThreatIntel />}
           <div className="split-row">
-            <div className="panel">
-              <h3>Attacker Map</h3>
-              <GeoMap decisions={decisions} />
-            </div>
-            <div className="panel">
-              <h3>Ban Trend + Event Rate (24h)</h3>
-              <Timeline data={timeline} />
-            </div>
+            {hasCrowdsec && (
+              <div className="panel">
+                <h3>Attacker Map</h3>
+                <GeoMap decisions={decisions} />
+              </div>
+            )}
+            {hasPrometheus && (
+              <div className="panel">
+                <h3>Ban Trend + Event Rate (24h)</h3>
+                <Timeline data={timeline} />
+              </div>
+            )}
           </div>
-          <SecurityBreakdown />
+          {hasCrowdsec && <SecurityBreakdown />}
+          {!hasCrowdsec && !hasPrometheus && (
+            <div className="panel" style={{ textAlign: 'center', padding: '3rem 1rem', opacity: 0.5 }}>
+              No security data sources configured. Enable CrowdSec or Prometheus in your environment.
+            </div>
+          )}
         </>
       )}
 
@@ -226,10 +241,15 @@ export default function App() {
 
       {tab === 'logs' && (
         <div className="feed-row feed-row-4">
-          <BansFeed decisions={decisions} />
-          <AttackOrigins decisions={decisions} />
-          <UnifiEventsFeed data={unifiLogs} />
-          <AttackBreakdown decisions={decisions} />
+          {hasCrowdsec && <BansFeed decisions={decisions} />}
+          {hasCrowdsec && <AttackOrigins decisions={decisions} />}
+          {(hasLoki || hasUnifi) && <UnifiEventsFeed data={unifiLogs} />}
+          {hasCrowdsec && <AttackBreakdown decisions={decisions} />}
+          {!hasCrowdsec && !hasLoki && !hasUnifi && (
+            <div className="panel" style={{ textAlign: 'center', padding: '3rem 1rem', opacity: 0.5 }}>
+              No log sources configured.
+            </div>
+          )}
         </div>
       )}
     </div>

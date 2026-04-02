@@ -9,12 +9,12 @@ All integrations are optional. If a service is not configured, its tab hides aut
 ## Screenshots
 
 ### Security Overview
-Threat level, active bans, attacker geo-map, ban trends, attack breakdown by type and severity.
+Threat level, active bans, attacker geo-map (color coded for mitigated/threat), ban trends, attack breakdown by type and severity.
 
 ![Security Tab](docs/screenshots/mock-1-security.png)
 
 ### Infrastructure
-Host registry with live port checks, grouped by role. Proxmox hypervisor stats with CPU/RAM and guest counts. Gate-locked for sensitive operations.
+Host registry with live port checks, organized by role. The Hypervisor section includes a dropdown to view all VMs/LXCs, and each guest exposes security-related stats. Proxmox hypervisors also display CPU, RAM, and total guest counts. Sensitive operations are gate-locked. Work in progress.
 
 ![Infrastructure Tab](docs/screenshots/mock-02-infrastructure.png)
 
@@ -29,12 +29,12 @@ Windows endpoint monitoring with process lists, event logs, and security alerts.
 ![Workstations Tab](docs/screenshots/mock-04-workstations.png)
 
 ### Logs
-Four-panel feed: CrowdSec active bans, attack origins by country/ISP, UniFi events, and attack scenario breakdown.
+Application-dependent logs displayed in a four-panel feed: CrowdSec active bans (if enabled), attack origins by country/ISP (CrowdSec-dependent), UniFi events, and attack scenario breakdown.
 
 ![Logs Tab](docs/screenshots/mock-05-logs.png)
 
 ### AI HelpDesk
-OpenAI-powered security assistant. General questions work without auth. Sensitive data (IPs, bans, topology) requires gate credentials. Example prompts included.
+OpenAI-powered security assistant. General questions work without auth. Sensitive data (IPs, bans, topology) requires gate credentials and API key. Example prompts included.
 
 ![HelpDesk](docs/screenshots/mock-06-helpdesk.png)
 

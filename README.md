@@ -11,7 +11,9 @@ All integrations are optional. If a service is not configured, its tab hides aut
 ### Security Overview
 Threat level, active bans, attacker geo-map (color coded for mitigated/threat), ban trends, attack breakdown by type and severity.
 
-![Security Tab](docs/screenshots/mock-1-security.png)
+<p align="center">
+  <img src="docs/screenshots/mock-1-security.png" width="100%">
+</p>
 
 ### Infrastructure
 Host registry with live port checks, organized by role. The Hypervisor section includes a dropdown to view all VMs/LXCs, and each guest exposes security-related stats. Proxmox hypervisors also display CPU, RAM, and total guest counts. Sensitive operations are gate-locked. Work in progress.

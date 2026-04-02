@@ -27,6 +27,8 @@ async def client() -> httpx.AsyncClient:
 # ── CrowdSec ──────────────────────────────────────────────
 
 async def crowdsec_get(path: str, params: dict | None = None) -> Any:
+    if not settings.crowdsec_url or not settings.enable_crowdsec:
+        raise ValueError("CrowdSec not configured")
     c = await client()
     headers = {"X-Api-Key": settings.crowdsec_api_key}
     r = await c.get(f"{settings.crowdsec_url}{path}", headers=headers, params=params)
@@ -61,6 +63,8 @@ async def loki_query(query: str, limit: int = 100, since_ns: int | None = None) 
     else:
         params["start"] = str((int(time.time()) - 86400) * 10**9)
     params["end"] = str(int(time.time()) * 10**9)
+    if not settings.loki_url or not settings.enable_loki:
+        return []
     try:
         r = await c.get(f"{settings.loki_url}/loki/api/v1/query_range", params=params)
         r.raise_for_status()
@@ -93,6 +97,8 @@ async def loki_count(query: str, range_seconds: int = 86400) -> int:
 # ── Prometheus ────────────────────────────────────────────
 
 async def prom_query(query: str) -> list[dict]:
+    if not settings.prometheus_url or not settings.enable_prometheus:
+        return []
     c = await client()
     try:
         r = await c.get(f"{settings.prometheus_url}/api/v1/query", params={"query": query})
@@ -104,6 +110,8 @@ async def prom_query(query: str) -> list[dict]:
 
 
 async def prom_query_range(query: str, start: int, end: int, step: str = "300") -> list[dict]:
+    if not settings.prometheus_url or not settings.enable_prometheus:
+        return []
     c = await client()
     try:
         r = await c.get(f"{settings.prometheus_url}/api/v1/query_range", params={

@@ -14,11 +14,11 @@ import SecurityBreakdown from './components/SecurityBreakdown'
 // Tabs that are always shown have feature: null.
 // Tabs with a feature string only show if that feature is enabled in /api/features.
 const ALL_TABS = [
-  { id: 'security',       label: 'Security',       icon: '⬡', feature: null },
+  { id: 'security',       label: 'Security',       icon: '⬡', feature: 'crowdsec' },
   { id: 'infrastructure', label: 'Infrastructure',  icon: '⬢', feature: 'proxmox' },
   { id: 'network',        label: 'Network',         icon: '◈', feature: 'unifi' },
   { id: 'workstations',   label: 'Workstations',    icon: '◻', feature: null },
-  { id: 'logs',           label: 'Logs',            icon: '▤', feature: null },
+  { id: 'logs',           label: 'Logs',            icon: '▤', feature: 'crowdsec' },
 ]
 
 const LEVEL_CONFIG = {
@@ -183,7 +183,7 @@ export default function App() {
         </div>
       </div>
 
-      <AiChat />
+      {featureEnabled('openai') && <AiChat />}
 
       <div className="tab-bar">
         <span className="tab-bar-label">◉ VIEW</span>

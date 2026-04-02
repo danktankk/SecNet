@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 import asyncio
+import logging
 import time
 import httpx
 from cachetools import TTLCache
 from config import settings
 
+logger = logging.getLogger(__name__)
+
 _cache: TTLCache = TTLCache(maxsize=10, ttl=60)
 _cookies: dict = {}
 _client: httpx.AsyncClient | None = None
 _login_lock: asyncio.Lock | None = None
+_last_login_attempt: float = 0
+_LOGIN_COOLDOWN = 30  # seconds between login attempts to avoid 429
 
 
 async def _get_client() -> httpx.AsyncClient:
@@ -21,19 +26,29 @@ async def _get_client() -> httpx.AsyncClient:
 
 
 async def _login() -> None:
-    global _cookies, _login_lock
+    global _cookies, _login_lock, _last_login_attempt
     if _login_lock is None:
         _login_lock = asyncio.Lock()
     async with _login_lock:
-        if _cookies:  # another coroutine already logged in while we waited
+        # If another coroutine already logged in while we waited, skip
+        if _cookies:
             return
+        # Rate-limit login attempts to avoid 429
+        elapsed = time.time() - _last_login_attempt
+        if elapsed < _LOGIN_COOLDOWN:
+            raise httpx.HTTPStatusError(
+                f"Login cooldown ({_LOGIN_COOLDOWN - elapsed:.0f}s remaining)",
+                request=httpx.Request("POST", settings.unifi_url),
+                response=httpx.Response(429),
+            )
+        _last_login_attempt = time.time()
         c = await _get_client()
-    r = await c.post(
-        f"{settings.unifi_url}/api/auth/login",
-        json={"username": settings.unifi_username, "password": settings.unifi_password},
-    )
-    r.raise_for_status()
-    _cookies = dict(r.cookies)
+        r = await c.post(
+            f"{settings.unifi_url}/api/auth/login",
+            json={"username": settings.unifi_username, "password": settings.unifi_password},
+        )
+        r.raise_for_status()
+        _cookies = dict(r.cookies)
 
 
 async def _get(path: str) -> list:
@@ -45,6 +60,7 @@ async def _get(path: str) -> list:
     c = await _get_client()
     r = await c.get(f"{settings.unifi_url}{path}", cookies=_cookies)
     if r.status_code == 401:
+        _cookies = {}  # clear stale cookies so _login() knows to re-auth
         await _login()
         r = await c.get(f"{settings.unifi_url}{path}", cookies=_cookies)
     r.raise_for_status()
@@ -55,9 +71,13 @@ async def get_clients() -> dict:
     if "clients" in _cache:
         return _cache["clients"]
 
-    # Fetch both clients and devices so we can resolve AP names
-    data = await _get("/proxy/network/api/s/default/stat/sta")
-    devices = await _get("/proxy/network/api/s/default/stat/device")
+    try:
+        # Fetch both clients and devices so we can resolve AP names
+        data = await _get("/proxy/network/api/s/default/stat/sta")
+        devices = await _get("/proxy/network/api/s/default/stat/device")
+    except Exception:
+        logger.exception("Failed to fetch UniFi clients")
+        return {"total": 0, "by_vlan": {}, "fetched_at": int(time.time()), "error": "UniFi API unavailable"}
 
     # Build AP MAC -> name map
     ap_names: dict[str, str] = {}
@@ -67,7 +87,6 @@ async def get_clients() -> dict:
 
     by_vlan: dict[str, list] = {}
     for client in data:
-        # Use the network field from UniFi API for VLAN grouping
         vlan_name = client.get("network", "Unknown")
         vlan_id = client.get("vlan", 0)
 
@@ -102,7 +121,11 @@ async def get_health() -> dict:
     if "health" in _cache:
         return _cache["health"]
 
-    data = await _get("/proxy/network/api/s/default/stat/health")
+    try:
+        data = await _get("/proxy/network/api/s/default/stat/health")
+    except Exception:
+        logger.exception("Failed to fetch UniFi health")
+        return {"subsystems": {}, "fetched_at": int(time.time()), "error": "UniFi API unavailable"}
 
     subsystems = {}
     for sub in data:
@@ -148,7 +171,11 @@ async def get_devices() -> dict:
     if "devices" in _cache:
         return _cache["devices"]
 
-    data = await _get("/proxy/network/api/s/default/stat/device")
+    try:
+        data = await _get("/proxy/network/api/s/default/stat/device")
+    except Exception:
+        logger.exception("Failed to fetch UniFi devices")
+        return {"gateways": [], "switches": [], "aps": [], "fetched_at": int(time.time()), "error": "UniFi API unavailable"}
 
     gateways, switches, aps = [], [], []
 
@@ -247,6 +274,7 @@ async def get_alarms() -> list:
             for a in data[:20]
         ]
     except Exception:
+        logger.exception("Failed to fetch UniFi alarms")
         result = []
     _cache["alarms"] = result
     return result

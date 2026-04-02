@@ -18,7 +18,7 @@ Built with FastAPI and React, packaged as a single Docker container.
 
 Live threat level, active ban count, attacker geo-map, 24-hour ban trends, and a full attack breakdown grouped by severity (Critical, High, Medium, Low). Each group expands to show the individual attacker IPs.
 
-<img src="docs/screenshots/mock-1-security.png" width="120%" />
+<img src="docs/screenshots/mock-01-security.png" width="120%" />
 
 ### Infrastructure
 

@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.db
+node_modules/
+frontend/dist/
+.DS_Store
+scripts/init-db.py
+*.swp
+*.swo
+*.log
+data/

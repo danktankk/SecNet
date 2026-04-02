@@ -1,0 +1,165 @@
+"""Abstract data layer — all external queries go through here.
+Swap implementations to migrate to InfluxDB/Prometheus storage later."""
+
+from __future__ import annotations
+import asyncio
+import logging
+import time
+from typing import Any
+import httpx
+from cachetools import TTLCache
+
+logger = logging.getLogger(__name__)
+from config import settings
+
+_client: httpx.AsyncClient | None = None
+_geo_cache: TTLCache = TTLCache(maxsize=10000, ttl=86400)
+_geo_semaphore = asyncio.Semaphore(2)  # limit concurrent geo requests
+
+
+async def client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=10.0)
+    return _client
+
+
+# ── CrowdSec ──────────────────────────────────────────────
+
+async def crowdsec_get(path: str, params: dict | None = None) -> Any:
+    c = await client()
+    headers = {"X-Api-Key": settings.crowdsec_api_key}
+    r = await c.get(f"{settings.crowdsec_url}{path}", headers=headers, params=params)
+    r.raise_for_status()
+    return r.json()
+
+
+async def get_decisions() -> list[dict]:
+    try:
+        data = await crowdsec_get("/v1/decisions/stream", {"startup": "true"})
+        return data.get("new") or []
+    except Exception:
+        logger.exception("Failed to fetch decisions")
+        return []
+
+
+async def get_alerts(since: str = "1h") -> list[dict]:
+    try:
+        return await crowdsec_get("/v1/alerts", {"since": since})
+    except Exception:
+        logger.exception("Failed to fetch alerts")
+        return []
+
+
+# ── Loki ──────────────────────────────────────────────────
+
+async def loki_query(query: str, limit: int = 100, since_ns: int | None = None) -> list[dict]:
+    c = await client()
+    params: dict[str, Any] = {"query": query, "limit": str(limit), "direction": "backward"}
+    if since_ns:
+        params["start"] = str(since_ns)
+    else:
+        params["start"] = str((int(time.time()) - 86400) * 10**9)
+    params["end"] = str(int(time.time()) * 10**9)
+    try:
+        r = await c.get(f"{settings.loki_url}/loki/api/v1/query_range", params=params)
+        r.raise_for_status()
+        data = r.json()
+        results = data.get("data", {}).get("result", [])
+        entries = []
+        for stream in results:
+            labels = stream.get("stream", {})
+            for ts, line in stream.get("values", []):
+                entries.append({"timestamp": ts, "line": line, "labels": labels})
+        return entries
+    except Exception:
+        logger.exception("Failed to fetch Loki query")
+        return []
+
+
+async def loki_count(query: str, range_seconds: int = 86400) -> int:
+    c = await client()
+    count_query = f'count_over_time({query}[{range_seconds}s])'
+    try:
+        r = await c.get(f"{settings.loki_url}/loki/api/v1/query", params={"query": count_query})
+        r.raise_for_status()
+        results = r.json().get("data", {}).get("result", [])
+        return sum(int(float(v[1])) for v in [r.get("value", [0, "0"]) for r in results])
+    except Exception:
+        logger.exception("Failed to fetch Loki count")
+        return 0
+
+
+# ── Prometheus ────────────────────────────────────────────
+
+async def prom_query(query: str) -> list[dict]:
+    c = await client()
+    try:
+        r = await c.get(f"{settings.prometheus_url}/api/v1/query", params={"query": query})
+        r.raise_for_status()
+        return r.json().get("data", {}).get("result", [])
+    except Exception:
+        logger.exception("Failed to fetch Prometheus query")
+        return []
+
+
+async def prom_query_range(query: str, start: int, end: int, step: str = "300") -> list[dict]:
+    c = await client()
+    try:
+        r = await c.get(f"{settings.prometheus_url}/api/v1/query_range", params={
+            "query": query, "start": str(start), "end": str(end), "step": step
+        })
+        r.raise_for_status()
+        return r.json().get("data", {}).get("result", [])
+    except Exception:
+        logger.exception("Failed to fetch Prometheus range query")
+        return []
+
+
+# ── GeoIP ─────────────────────────────────────────────────
+
+async def geoip_lookup(ip: str) -> dict | None:
+    if ip in _geo_cache:
+        return _geo_cache[ip]
+    async with _geo_semaphore:
+        if ip in _geo_cache:
+            return _geo_cache[ip]
+        c = await client()
+        try:
+            r = await c.get(f"http://ip-api.com/json/{ip}?fields=status,country,countryCode,city,lat,lon,isp,org,as")
+            if r.status_code == 429:
+                await asyncio.sleep(1)
+                return None
+            data = r.json()
+            if data.get("status") == "success":
+                _geo_cache[ip] = data
+                return data
+        except Exception:
+            logger.exception("Failed to fetch GeoIP lookup for %s", ip)
+    return None
+
+
+async def geoip_batch(ips: list[str]) -> dict[str, dict]:
+    results = {}
+    to_lookup = [ip for ip in set(ips) if ip not in _geo_cache]
+    cached = {ip: _geo_cache[ip] for ip in set(ips) if ip in _geo_cache}
+    results.update(cached)
+
+    # Batch via ip-api.com batch endpoint (max 100)
+    if to_lookup:
+        c = await client()
+        for i in range(0, len(to_lookup), 100):
+            batch = to_lookup[i:i+100]
+            try:
+                r = await c.post("http://ip-api.com/batch?fields=status,query,country,countryCode,city,lat,lon,isp,org,as", json=batch)
+                if r.status_code == 200:
+                    for item in r.json():
+                        if item.get("status") == "success":
+                            ip = item["query"]
+                            _geo_cache[ip] = item
+                            results[ip] = item
+                if i + 100 < len(to_lookup):
+                    await asyncio.sleep(1.5)
+            except Exception:
+                logger.exception("Failed to fetch GeoIP batch")
+    return results

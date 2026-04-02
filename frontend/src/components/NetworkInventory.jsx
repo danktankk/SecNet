@@ -417,7 +417,7 @@ export default function NetworkInventory() {
     }
   }
 
-  const groupOrder = ['Core', 'Nodes', 'Tools', 'Workstations']
+  const groupOrder = Object.keys(hostGroups).sort((a, b) => ['Core','Nodes','Tools','Production','Workstations','Monitoring'].indexOf(a) - ['Core','Nodes','Tools','Production','Workstations','Monitoring'].indexOf(b))
 
   const onlineCount = hostsData ? hostsData.filter(h => h.online).length : 0
   const totalCount = hostsData ? hostsData.length : 0

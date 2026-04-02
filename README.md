@@ -11,7 +11,7 @@ All integrations are optional. If a service is not configured, its tab hides aut
 ### Security Overview
 Threat level, active bans, attacker geo-map, ban trends, attack breakdown by type and severity.
 
-![Security Tab](docs/screenshots/mock-01-security.png)
+![Security Tab](docs/screenshots/mock-1-security.png)
 
 ### Infrastructure
 Host registry with live port checks, grouped by role. Proxmox hypervisor stats with CPU/RAM and guest counts. Gate-locked for sensitive operations.

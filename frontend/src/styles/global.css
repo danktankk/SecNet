@@ -406,8 +406,8 @@ body {
 
 .ws-card-body { padding: 12px 14px; border-top: 1px solid var(--border); }
 
-.ws-detail-row { display: grid; grid-template-columns: 220px 1fr; gap: 16px; }
-@media (max-width: 700px) { .ws-detail-row { grid-template-columns: 1fr; } }
+.ws-detail-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .ws-detail-split { grid-template-columns: 1fr; } }
 
 .ws-col { }
 .ws-section-label { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
@@ -425,7 +425,8 @@ body {
 .ws-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
 .ws-bar-pct { font-size: 0.7rem; font-family: var(--mono); width: 34px; flex-shrink: 0; }
 
-.ws-proc-table { }
+.ws-proc-table { display: flex; flex-direction: column; }
+.ws-proc-scroll { max-height: 320px; overflow-y: auto; }
 .ws-proc-header, .ws-proc-row { display: grid; grid-template-columns: 2fr 0.8fr 0.8fr 0.8fr 2fr; gap: 4px; padding: 3px 0; font-size: 0.72rem; align-items: center; }
 .ws-proc-header { color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); margin-bottom: 3px; }
 .ws-proc-row { border-bottom: 1px solid rgba(48,54,61,0.3); }
@@ -435,13 +436,13 @@ body {
 .ws-proc-flags { display: flex; gap: 3px; flex-wrap: wrap; }
 .ws-flag { font-size: 0.65rem; border: 1px solid; border-radius: 3px; padding: 1px 4px; font-weight: 600; }
 
-.ws-event-log { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 1px; }
-.ws-event-row { display: grid; grid-template-columns: 20px 60px 70px 1fr; gap: 8px; padding: 4px 4px; font-size: 0.73rem; align-items: start; border-bottom: 1px solid rgba(48,54,61,0.25); }
+.ws-event-log { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 1px; max-height: 360px; overflow-y: auto; }
+.ws-event-row { display: grid; grid-template-columns: 60px 70px 1fr; gap: 8px; padding: 4px 6px; font-size: 0.73rem; align-items: start; border-bottom: 1px solid rgba(48,54,61,0.25); }
 .ws-event-row:last-child { border-bottom: none; }
 .ws-event-icon { font-size: 0.65rem; }
 .ws-event-time { font-size: 0.7rem; }
 .ws-event-id { font-size: 0.7rem; }
-.ws-event-msg { color: var(--text-muted); font-size: 0.73rem; line-height: 1.4; }
+.ws-event-msg { color: var(--text-muted); font-size: 0.73rem; line-height: 1.4; word-break: break-word; white-space: normal; }
 
 /* AI Chat — examples persistent panel */
 .ai-examples-bar { border-top: 1px solid var(--border); padding: 4px 8px; }

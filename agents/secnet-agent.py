@@ -94,7 +94,7 @@ def get_events():
                 eid = ev.EventID & 0xFFFF
                 if eid not in SECURITY_EVENT_IDS: continue
                 t = ev.TimeGenerated.strftime('%H:%M:%S') if ev.TimeGenerated else ''
-                try: msg = win32evtlogutil.SafeFormatMessage(ev, 'Security').split('\n')[0][:120]
+                try: msg = ' '.join(line.strip() for line in win32evtlogutil.SafeFormatMessage(ev, 'Security').split(chr(10)) if line.strip())[:300]
                 except: msg = f'Event {eid}'
                 level = 'critical' if eid in {4648,4703,4704} else 'warn' if eid == 4625 else 'info'
                 events.append({'id': eid, 'level': level, 'time': t, 'msg': msg})

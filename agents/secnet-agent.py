@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 SecNet Windows Agent — standalone EXE that installs as a Windows Service.
+Compatible with Windows 10 and Windows 11.
 
 Build:  pip install pyinstaller psutil requests pywin32
         pyinstaller --onefile --name secnet-agent --hidden-import=win32timezone secnet-agent.py
@@ -72,6 +73,26 @@ def save_config(cfg: dict):
         json.dump(cfg, f, indent=2)
 
 
+# ── PowerShell helper ─────────────────────────────────────
+
+def _ps(command: str, timeout: int = 15) -> str | None:
+    """Run a PowerShell command, return stdout or None on failure.
+    Uses pwsh (PowerShell 7) if available, falls back to powershell (5.1)."""
+    for shell in ('pwsh', 'powershell'):
+        try:
+            r = subprocess.run(
+                [shell, '-NonInteractive', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command],
+                capture_output=True, text=True, timeout=timeout,
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                return r.stdout.strip()
+        except FileNotFoundError:
+            continue
+        except Exception:
+            continue
+    return None
+
+
 # ── Collection ────────────────────────────────────────────
 
 def get_primary_ip_mac():
@@ -117,20 +138,34 @@ def get_processes():
 
 
 def get_events_powershell():
+    """Fetch Windows Security Event Log. Works on Win10 and Win11."""
     ids = ','.join(str(i) for i in SECURITY_EVENT_IDS)
-    ps = f"Get-WinEvent -LogName Security -MaxEvents 100 | Where-Object {{$_.Id -in @({ids})}} | Select-Object -First {MAX_EVENTS} Id,TimeCreated,Message | ConvertTo-Json -Compress"
+    # Get-WinEvent works on both Win10 and Win11 (it's the modern API).
+    # -ErrorAction SilentlyContinue handles the case where Security log
+    # requires elevation — returns empty instead of crashing.
+    ps = (
+        f"Get-WinEvent -LogName Security -MaxEvents 100 -ErrorAction SilentlyContinue | "
+        f"Where-Object {{$_.Id -in @({ids})}} | "
+        f"Select-Object -First {MAX_EVENTS} Id,TimeCreated,Message | "
+        f"ConvertTo-Json -Compress"
+    )
     try:
-        result = subprocess.run(['powershell', '-NonInteractive', '-NoProfile', '-Command', ps], capture_output=True, text=True, timeout=15)
-        if result.returncode != 0 or not result.stdout.strip():
+        out = _ps(ps)
+        if not out:
             return []
-        raw = json.loads(result.stdout)
+        raw = json.loads(out)
         if isinstance(raw, dict):
             raw = [raw]
         events = []
         for ev in raw:
             eid = ev.get('Id', 0)
             ts = ev.get('TimeCreated', {})
-            ts_str = ts.get('value', ts.get('Value', '')) if isinstance(ts, dict) else str(ts)
+            # TimeCreated can be a dict with /Date()/ or an ISO string
+            ts_str = ''
+            if isinstance(ts, dict):
+                ts_str = ts.get('value', ts.get('Value', ts.get('DateTime', '')))
+            elif isinstance(ts, str):
+                ts_str = ts
             try:
                 dt = time.strptime(ts_str[:19], '%Y-%m-%dT%H:%M:%S')
                 t = time.strftime('%H:%M:%S', dt)
@@ -145,14 +180,32 @@ def get_events_powershell():
         return []
 
 
-def try_get_domain():
+def get_domain():
+    """Get AD domain. Uses Get-CimInstance (Win11) with Get-WmiObject fallback (Win10)."""
+    # Try CIM first (works on Win10+, required on Win11 where WMI cmdlets removed)
+    out = _ps('(Get-CimInstance Win32_ComputerSystem).Domain', timeout=5)
+    if out:
+        return out
+    # Fallback for older systems
+    out = _ps('(Get-WmiObject Win32_ComputerSystem).Domain', timeout=5)
+    return out or ''
+
+
+def get_os_version():
+    """Return a human-readable OS string. Handles Win11 build number detection."""
+    release = platform.release()       # "10" for both Win10 and Win11
+    version = platform.version()       # "10.0.22631" etc.
+    build = 0
     try:
-        r = subprocess.run(['powershell', '-NonInteractive', '-NoProfile', '-Command', '(Get-WmiObject Win32_ComputerSystem).Domain'], capture_output=True, text=True, timeout=5)
-        if r.returncode == 0:
-            return r.stdout.strip()
-    except Exception:
+        build = int(version.split('.')[-1]) if version else 0
+    except ValueError:
         pass
-    return ''
+    # Windows 11 is build 22000+, but platform.release() still says "10"
+    if release == '10' and build >= 22000:
+        name = 'Windows 11'
+    else:
+        name = f'Windows {release}'
+    return f"{name} ({version[:20]})"
 
 
 def collect():
@@ -164,8 +217,8 @@ def collect():
     return {
         'hostname': socket.gethostname(),
         'ip': ip, 'mac': mac,
-        'os': f"{platform.system()} {platform.release()} {platform.version()[:30]}",
-        'domain': try_get_domain(),
+        'os': get_os_version(),
+        'domain': get_domain(),
         'user': user, 'session_start': session_start,
         'cpu': int(cpu), 'ram': int(mem.percent), 'disk': int(disk.percent),
         'processes': get_processes(),
@@ -253,7 +306,6 @@ except ImportError:
 # ── CLI Commands ──────────────────────────────────────────
 
 def _exe_path():
-    """Return the path to this exe (or script if running from source)."""
     if getattr(sys, 'frozen', False):
         return sys.executable
     return os.path.abspath(__file__)
@@ -277,6 +329,7 @@ def cmd_setup(args):
         print(f'  Connection: {"OK" if r.status_code == 200 else f"HTTP {r.status_code}"}')
     except Exception as e:
         print(f'  Connection: FAILED ({e})')
+    print(f'  OS detected: {get_os_version()}')
 
 
 def cmd_install(args):
@@ -288,15 +341,13 @@ def cmd_install(args):
         print('ERROR: Run setup first: secnet-agent setup --url URL --key KEY')
         sys.exit(1)
 
-    # Copy exe to Program Files
     src = _exe_path()
     os.makedirs(PROGRAM_DIR, exist_ok=True)
     if os.path.normpath(src) != os.path.normpath(INSTALL_EXE):
         shutil.copy2(src, INSTALL_EXE)
         print(f'Copied to {INSTALL_EXE}')
 
-    # Install the service pointing to the installed exe
-    # sc create is more reliable than win32serviceutil for frozen exes
+    # Use sc.exe — works reliably with frozen PyInstaller exes on Win10/11
     subprocess.run([
         'sc', 'create', SERVICE_NAME,
         f'binPath={INSTALL_EXE} --run-service',
@@ -304,10 +355,10 @@ def cmd_install(args):
         'start=auto',
     ], check=True)
     subprocess.run(['sc', 'description', SERVICE_NAME, SERVICE_DESC], check=True)
-    # Set restart on failure: restart after 10s, 30s, 60s
-    subprocess.run(['sc', 'failure', SERVICE_NAME, 'reset=86400', 'actions=restart/10000/restart/30000/restart/60000'], check=True)
-    print(f'Service "{SERVICE_NAME}" installed')
-    print(f'Start with: secnet-agent start  (or net start {SERVICE_NAME})')
+    subprocess.run(['sc', 'failure', SERVICE_NAME, 'reset=86400',
+                     'actions=restart/10000/restart/30000/restart/60000'], check=True)
+    print(f'Service "{SERVICE_NAME}" installed (auto-start on boot)')
+    print(f'Start now: secnet-agent start')
 
 
 def cmd_remove(args):
@@ -315,6 +366,13 @@ def cmd_remove(args):
     time.sleep(2)
     subprocess.run(['sc', 'delete', SERVICE_NAME], check=True)
     print(f'Service "{SERVICE_NAME}" removed')
+    # Optionally clean up installed exe
+    if os.path.exists(INSTALL_EXE):
+        try:
+            os.remove(INSTALL_EXE)
+            print(f'Removed {INSTALL_EXE}')
+        except Exception:
+            print(f'Note: could not remove {INSTALL_EXE} (may be in use)')
 
 
 def cmd_start(args):
@@ -353,6 +411,7 @@ def cmd_status(args):
     print()
     print(f'Exe:     {INSTALL_EXE}  {"(exists)" if os.path.exists(INSTALL_EXE) else "(not found)"}')
     print(f'Log:     {LOG_FILE}  {"(exists)" if os.path.exists(LOG_FILE) else "(not found)"}')
+    print(f'OS:      {get_os_version()}')
 
 
 def cmd_run(args):
@@ -368,7 +427,6 @@ def cmd_run(args):
 
 
 def _run_as_service():
-    """Entry point when Windows SCM starts us with --run-service."""
     if not HAS_WIN32:
         sys.exit(1)
     servicemanager.Initialize()
@@ -377,7 +435,6 @@ def _run_as_service():
 
 
 def main():
-    # If SCM started us with --run-service, go straight to service mode
     if '--run-service' in sys.argv:
         _run_as_service()
         return
@@ -410,7 +467,6 @@ Quick start (run as Administrator):
     p_run.add_argument('--url', default='')
     p_run.add_argument('--key', default='')
 
-    # Legacy compat
     parser.add_argument('--url', default='', help=argparse.SUPPRESS)
     parser.add_argument('--key', default='', help=argparse.SUPPRESS)
     parser.add_argument('--once', action='store_true', help=argparse.SUPPRESS)

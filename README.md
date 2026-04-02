@@ -42,9 +42,9 @@ Four live feeds side by side: CrowdSec active bans (filterable by LOCAL/CAPI), a
 
 <img src="docs/screenshots/mock-05-logs.png" width="100%" />
 
-### AI HelpDesk
+### HelpDesk (API driven)
 
-OpenAI-powered assistant that knows your dashboard context. General security questions work without authentication. Questions about your specific infrastructure (IPs, bans, topology) require gate credentials first. Includes example prompts for both categories.
+A low cost and relatively basic OpenAI-powered assistant [will add additional options if requested] that knows your dashboard context. It will (should) answer general security questions related to security without authentication. Questions about your specific infrastructure (IPs, bans, topology) require gate credentials first. Includes example prompts for both categories. 
 
 <img src="docs/screenshots/mock-06-helpdesk.png" width="100%" />
 

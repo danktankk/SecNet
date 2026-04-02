@@ -5,12 +5,20 @@ from fastapi.responses import FileResponse
 from routers.api import router as api_router
 from routers.ws import router as ws_router
 from db import init_db
+from services.discovery import run_discovery
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    try:
+        run_discovery()
+    except Exception:
+        logger.exception("Discovery failed — continuing with existing hosts")
     yield
 
 

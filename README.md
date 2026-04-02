@@ -281,7 +281,7 @@ Every integration is optional. Configure only what you have.
 |------------|-------------------|--------------|
 | CrowdSec | `CROWDSEC_URL`, `CROWDSEC_API_KEY` | Ban tracking, attacker geo-mapping, threat intel, attack breakdown |
 | UniFi | `UNIFI_URL`, `UNIFI_USERNAME`, `UNIFI_PASSWORD` | AP health, switch port status, client monitoring, VLAN distribution |
-| Proxmox | `PVE1_URL`, `PVE1_TOKEN` (supports up to 3 nodes) | Hypervisor CPU/RAM, VM and container inventory |
+| Proxmox | `PVE1_URL`, `PVE1_TOKEN` (supports up to 3 nodes) | Hypervisor CPU/RAM, VM and container inventory. VMs need qemu-guest-agent; LXCs need static IPs in net config for auto-discovery. |
 | Loki | `LOKI_URL` | Log aggregation, Traefik and CrowdSec event feeds |
 | Prometheus | `PROMETHEUS_URL` | Metrics and alerting data |
 | OpenAI | `OPENAI_API_KEY` | AI security assistant (HelpDesk tab) |

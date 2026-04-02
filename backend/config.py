@@ -8,6 +8,8 @@ class Settings(BaseSettings):
 
     crowdsec_url: str = ""
     crowdsec_api_key: str = ""
+    crowdsec_machine_id: str = ""
+    crowdsec_machine_password: str = ""
     loki_url: str = ""
     prometheus_url: str = ""
     unifi_url: str = ""

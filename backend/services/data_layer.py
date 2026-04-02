@@ -14,7 +14,11 @@ from config import settings
 
 _client: httpx.AsyncClient | None = None
 _geo_cache: TTLCache = TTLCache(maxsize=10000, ttl=86400)
-_geo_semaphore = asyncio.Semaphore(2)  # limit concurrent geo requests
+_geo_semaphore = asyncio.Semaphore(2)
+
+# CrowdSec machine auth (JWT for alerts endpoint)
+_cs_jwt: str = ""
+_cs_jwt_expires: float = 0
 
 
 async def client() -> httpx.AsyncClient:
@@ -27,11 +31,50 @@ async def client() -> httpx.AsyncClient:
 # ── CrowdSec ──────────────────────────────────────────────
 
 async def crowdsec_get(path: str, params: dict | None = None) -> Any:
+    """Bouncer API — for decisions."""
     if not settings.crowdsec_url or not settings.enable_crowdsec:
         raise ValueError("CrowdSec not configured")
     c = await client()
     headers = {"X-Api-Key": settings.crowdsec_api_key}
     r = await c.get(f"{settings.crowdsec_url}{path}", headers=headers, params=params)
+    r.raise_for_status()
+    return r.json()
+
+
+async def _cs_machine_token() -> str:
+    """Get a JWT for CrowdSec LAPI machine auth (alerts endpoint)."""
+    global _cs_jwt, _cs_jwt_expires
+    if _cs_jwt and time.time() < _cs_jwt_expires - 60:
+        return _cs_jwt
+    if not settings.crowdsec_machine_id or not settings.crowdsec_machine_password:
+        return ""
+    c = await client()
+    r = await c.post(f"{settings.crowdsec_url}/v1/watchers/login", json={
+        "machine_id": settings.crowdsec_machine_id,
+        "password": settings.crowdsec_machine_password,
+    })
+    r.raise_for_status()
+    data = r.json()
+    _cs_jwt = data.get("token", "")
+    # Parse expire time, default 1 hour
+    try:
+        from datetime import datetime
+        exp = datetime.fromisoformat(data["expire"].replace("Z", "+00:00"))
+        _cs_jwt_expires = exp.timestamp()
+    except Exception:
+        _cs_jwt_expires = time.time() + 3600
+    return _cs_jwt
+
+
+async def crowdsec_alerts_get(path: str, params: dict | None = None) -> Any:
+    """Machine auth — for alerts endpoint."""
+    if not settings.crowdsec_url or not settings.enable_crowdsec:
+        raise ValueError("CrowdSec not configured")
+    token = await _cs_machine_token()
+    if not token:
+        raise ValueError("CrowdSec machine credentials not configured")
+    c = await client()
+    r = await c.get(f"{settings.crowdsec_url}{path}", headers={"Authorization": f"Bearer {token}"}, params=params)
     r.raise_for_status()
     return r.json()
 
@@ -49,7 +92,7 @@ async def get_decisions() -> list[dict]:
 
 async def get_alerts(since: str = "1h") -> list[dict]:
     try:
-        return await crowdsec_get("/v1/alerts", {"since": since})
+        return await crowdsec_alerts_get("/v1/alerts", {"since": since})
     except ValueError:
         return []
     except Exception:
@@ -60,6 +103,8 @@ async def get_alerts(since: str = "1h") -> list[dict]:
 # ── Loki ──────────────────────────────────────────────────
 
 async def loki_query(query: str, limit: int = 100, since_ns: int | None = None) -> list[dict]:
+    if not settings.loki_url or not settings.enable_loki:
+        return []
     c = await client()
     params: dict[str, Any] = {"query": query, "limit": str(limit), "direction": "backward"}
     if since_ns:
@@ -67,8 +112,6 @@ async def loki_query(query: str, limit: int = 100, since_ns: int | None = None) 
     else:
         params["start"] = str((int(time.time()) - 86400) * 10**9)
     params["end"] = str(int(time.time()) * 10**9)
-    if not settings.loki_url or not settings.enable_loki:
-        return []
     try:
         r = await c.get(f"{settings.loki_url}/loki/api/v1/query_range", params=params)
         r.raise_for_status()
@@ -159,7 +202,6 @@ async def geoip_batch(ips: list[str]) -> dict[str, dict]:
     cached = {ip: _geo_cache[ip] for ip in set(ips) if ip in _geo_cache}
     results.update(cached)
 
-    # Batch via ip-api.com batch endpoint (max 100)
     if to_lookup:
         c = await client()
         for i in range(0, len(to_lookup), 100):

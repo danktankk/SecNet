@@ -17,12 +17,12 @@ import { TOKEN_KEY } from './utils/gate'
 // feature: string = show if that feature is enabled
 // feature: [string, ...] = show if ANY of those features are enabled
 const ALL_TABS = [
-  { id: 'security',       label: 'Security',       icon: '\u2B21', feature: null },
-  { id: 'infrastructure', label: 'Infrastructure',  icon: '\u2B22', feature: 'proxmox' },
-  { id: 'network',        label: 'Network',         icon: '\u25C8', feature: 'unifi' },
-  { id: 'workstations',   label: 'Workstations',    icon: '\u25FB', feature: 'workstations' },
-  { id: 'logs',           label: 'Logs',            icon: '\u25A4', feature: ['crowdsec', 'loki', 'unifi'] },
-  { id: 'setup',          label: 'Setup',           icon: '\u25CE', feature: null },
+  { id: 'security',       label: 'Security',     icon: '\u2B21', feature: null,                          group: null },
+  { id: 'network',        label: 'Network',       icon: '\u25C8', feature: 'unifi',                       group: null },
+  { id: 'workstations',   label: 'Workstations',  icon: '\u25FB', feature: 'workstations',                group: null },
+  { id: 'logs',           label: 'Logs',          icon: '\u25A4', feature: ['crowdsec', 'loki', 'unifi'], group: null },
+  { id: 'infrastructure', label: 'Ops',           icon: '\u2B22', feature: 'proxmox',                     group: 'Utilities' },
+  { id: 'setup',          label: 'Setup',         icon: '\u25CE', feature: null,                          group: null },
 ]
 
 const LEVEL_CONFIG = {
@@ -216,7 +216,7 @@ export default function App() {
       <div className="tab-bar">
         <span className="tab-bar-label">{'\u25C9'} VIEW</span>
         <div className="tab-bar-divider" />
-        {visibleTabs.map(t => (
+        {visibleTabs.filter(t => !t.group).map(t => (
           <button
             key={t.id}
             className={`tab-btn ${tab === t.id ? 'tab-active' : ''}`}
@@ -226,6 +226,22 @@ export default function App() {
             <span className="tab-label">{t.label}</span>
           </button>
         ))}
+        {visibleTabs.some(t => t.group === 'Utilities') && (
+          <>
+            <div className="tab-bar-divider" />
+            <span className="tab-bar-label">UTIL</span>
+            {visibleTabs.filter(t => t.group === 'Utilities').map(t => (
+              <button
+                key={t.id}
+                className={`tab-btn ${tab === t.id ? 'tab-active' : ''}`}
+                onClick={() => setTab(t.id)}
+              >
+                <span className="tab-icon">{t.icon}</span>
+                <span className="tab-label">{t.label}</span>
+              </button>
+            ))}
+          </>
+        )}
       </div>
 
       {tab === 'security' && (

@@ -22,7 +22,8 @@ if [[ $EUID -ne 0 ]]; then echo "Run with sudo"; exit 1; fi
 
 echo "Installing SecNet agent..."
 
-pip3 install --quiet psutil requests 2>/dev/null || pip install --quiet psutil requests
+pip3 install --quiet --break-system-packages psutil requests 2>/dev/null || \
+  pip install --quiet --break-system-packages psutil requests
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$SCRIPT_DIR/secnet-agent-mac.py" ]]; then

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """SecNet Windows Agent"""
-import json, os, platform, shutil, socket, subprocess, sys, time, logging, ctypes, threading
+import json, os, platform, shutil, socket, subprocess, sys, time, logging, logging.handlers, ctypes, threading
 import psutil, requests
 
 PROGRAM_DIR = os.path.join(os.environ.get('PROGRAMFILES', 'C:\\Program Files'), 'SecNet')
@@ -160,7 +160,8 @@ try:
             win32event.SetEvent(self.stop_event)
         def SvcDoRun(self):
             os.makedirs(CONFIG_DIR, exist_ok=True)
-            fh = logging.FileHandler(LOG_FILE)
+            fh = logging.handlers.RotatingFileHandler(
+                LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3)
             fh.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
             logging.getLogger().addHandler(fh)
             cfg = load_config()

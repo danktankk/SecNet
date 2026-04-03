@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any
+from datetime import datetime
 import httpx
 from cachetools import TTLCache
 
@@ -30,7 +30,7 @@ async def client() -> httpx.AsyncClient:
 
 # ── CrowdSec ──────────────────────────────────────────────
 
-async def crowdsec_get(path: str, params: dict | None = None) -> Any:
+async def crowdsec_get(path: str, params: dict | None = None) -> dict | list:
     """Bouncer API — for decisions."""
     if not settings.crowdsec_url or not settings.enable_crowdsec:
         raise ValueError("CrowdSec not configured")
@@ -58,7 +58,6 @@ async def _cs_machine_token() -> str:
     _cs_jwt = data.get("token", "")
     # Parse expire time, default 1 hour
     try:
-        from datetime import datetime
         exp = datetime.fromisoformat(data["expire"].replace("Z", "+00:00"))
         _cs_jwt_expires = exp.timestamp()
     except Exception:
@@ -66,7 +65,7 @@ async def _cs_machine_token() -> str:
     return _cs_jwt
 
 
-async def crowdsec_alerts_get(path: str, params: dict | None = None) -> Any:
+async def crowdsec_alerts_get(path: str, params: dict | None = None) -> dict | list:
     """Machine auth — for alerts endpoint."""
     if not settings.crowdsec_url or not settings.enable_crowdsec:
         raise ValueError("CrowdSec not configured")
@@ -106,7 +105,7 @@ async def loki_query(query: str, limit: int = 100, since_ns: int | None = None) 
     if not settings.loki_url or not settings.enable_loki:
         return []
     c = await client()
-    params: dict[str, Any] = {"query": query, "limit": str(limit), "direction": "backward"}
+    params: dict = {"query": query, "limit": str(limit), "direction": "backward"}
     if since_ns:
         params["start"] = str(since_ns)
     else:
@@ -215,7 +214,7 @@ async def geoip_batch(ips: list[str]) -> dict[str, dict]:
                             _geo_cache[ip] = item
                             results[ip] = item
                 if i + 100 < len(to_lookup):
-                    await asyncio.sleep(1.5)
+                    await asyncio.sleep(60.0 / settings.geoip_rate_limit)
             except Exception:
                 logger.exception("Failed to fetch GeoIP batch")
     return results

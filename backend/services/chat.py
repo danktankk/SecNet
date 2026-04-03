@@ -1,7 +1,6 @@
 """AI chat service with security gate and tool calling."""
 
 from __future__ import annotations
-import hmac
 import json
 import logging
 from openai import AsyncOpenAI
@@ -211,8 +210,3 @@ async def chat(messages: list[dict], session_unlocked: bool, dashboard_context: 
     )
     return followup.choices[0].message.content or ""
 
-
-def check_gate_answer(answer: str) -> bool:
-    if not settings.security_gate_code:
-        return False
-    return hmac.compare_digest(answer.strip(), settings.security_gate_code)

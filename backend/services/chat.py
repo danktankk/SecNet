@@ -24,7 +24,6 @@ ALLOWED_AI_WRITE_KEYS = {
     "CROWDSEC_MACHINE_ID", "CROWDSEC_MACHINE_PASSWORD",
     "UNIFI_URL", "UNIFI_USERNAME", "UNIFI_PASSWORD",
     "PVE1_URL", "PVE1_TOKEN", "PVE2_URL", "PVE2_TOKEN", "PVE3_URL", "PVE3_TOKEN",
-    "FRITZ_URL", "FRITZ_USER", "FRITZ_PASSWORD",
     "WORKSTATION_AGENT_KEY", "OPENAI_API_KEY", "OPENAI_MODEL",
     "GEOIP_PROVIDER", "GEOIP_RATE_LIMIT", "POLL_INTERVAL",
 }
@@ -210,7 +209,7 @@ async def chat(messages: list[dict], session_unlocked: bool, dashboard_context: 
         max_tokens=2048,
         temperature=0.7,
     )
-    return followup.choices[0].message.content or Done.
+    return followup.choices[0].message.content or ""
 
 
 def check_gate_answer(answer: str) -> bool:

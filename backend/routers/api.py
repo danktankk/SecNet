@@ -170,7 +170,6 @@ async def network_scan_all():
         host = node.get("url", "").replace("https://", "").replace(":8006", "")
         if host:
             ips.add(host)
-    import asyncio
     results = await asyncio.gather(*[network.scan_host(ip, force=True) for ip in ips])
     return list(results)
 
@@ -247,30 +246,24 @@ async def workstations():
 
 # ── Environment Discovery ─────────────────────────────────
 
-_scan_lock = asyncio.Lock()
-_last_scan: dict | None = None
-
-
 class ConfigUpdateRequest(BaseModel):
     updates: dict[str, str]
 
 
 @router.post("/discovery/scan", dependencies=[Depends(_require_gate)])
 async def discovery_scan(include_subnet: bool = True):
-    global _last_scan
-    if _scan_lock.locked():
+    result = await env_scan_svc.run_scan_locked(include_subnet=include_subnet)
+    if result is None:
         raise HTTPException(status_code=409, detail="Scan already in progress")
-    async with _scan_lock:
-        result = await env_scan_svc.run_scan(include_subnet=include_subnet)
-        _last_scan = result
     return {"status": "complete", **result}
 
 
 @router.get("/discovery/last", dependencies=[Depends(_require_gate)])
 async def discovery_last():
-    if _last_scan is None:
+    last = env_scan_svc.get_last_scan()
+    if last is None:
         return {"status": "none", "message": "No scan has been run yet"}
-    return {"status": "complete", **_last_scan}
+    return {"status": "complete", **last}
 
 
 @router.post("/config/update", dependencies=[Depends(_require_gate)])

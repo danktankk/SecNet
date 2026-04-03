@@ -1,7 +1,6 @@
 """Workstation registry — read/write from SQLite."""
 from __future__ import annotations
 import json
-import sqlite3
 import time
 from typing import Any
 import db
@@ -57,8 +56,7 @@ def upsert_workstation(data: dict) -> None:
 
     status, alerts = _compute_status(procs)
 
-    conn = sqlite3.connect(db._DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = db.connect()
     try:
         conn.execute("""
             INSERT INTO workstations (id, hostname, ip, mac, os, domain, ws_user,
@@ -102,8 +100,7 @@ def upsert_workstation(data: dict) -> None:
 
 
 def get_all() -> list[dict]:
-    conn = sqlite3.connect(db._DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = db.connect()
     try:
         ws_rows = conn.execute("SELECT * FROM workstations ORDER BY last_seen DESC").fetchall()
         result = []

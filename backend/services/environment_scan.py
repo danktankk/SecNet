@@ -355,3 +355,24 @@ async def run_scan(include_subnet: bool = True) -> dict:
         "scan_duration_seconds": duration,
         "scanned_at":            time.time(),
     }
+
+
+# ── Scan state — owned here, not in the router ───────────────────────────────
+
+_scan_lock = asyncio.Lock()
+_last_scan: dict | None = None
+
+
+async def run_scan_locked(include_subnet: bool = True) -> dict | None:
+    """Run a scan if not already in progress. Returns None if scan is already running."""
+    global _last_scan
+    if _scan_lock.locked():
+        return None
+    async with _scan_lock:
+        result = await run_scan(include_subnet=include_subnet)
+        _last_scan = result
+    return result
+
+
+def get_last_scan() -> dict | None:
+    return _last_scan

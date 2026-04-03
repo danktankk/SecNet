@@ -7,24 +7,19 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-import os
 from typing import Any
 
 import httpx
 from config import settings
+import db
 
 logger = logging.getLogger(__name__)
-_DB_PATH = os.environ.get("SECNET_DB", "/data/secnet.db")
 
 
-def _connect():
-    conn = sqlite3.connect(_DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 def _existing_ips() -> set[str]:
-    conn = _connect()
+    conn = db.connect()
     try:
         return {r["ip"] for r in conn.execute("SELECT ip FROM hosts").fetchall()}
     finally:
@@ -32,7 +27,7 @@ def _existing_ips() -> set[str]:
 
 
 def _insert_host(name: str, ip: str, group: str, role: str, check_port: int = 22, services: list[str] | None = None, link: str | None = None):
-    conn = _connect()
+    conn = db.connect()
     try:
         conn.execute(
             "INSERT INTO hosts (name, ip, group_name, role, check_port, services, link, skip_check) VALUES (?,?,?,?,?,?,?,0)",
@@ -46,7 +41,7 @@ def _insert_host(name: str, ip: str, group: str, role: str, check_port: int = 22
 
 
 def _insert_known_ip(hostname: str, ip: str):
-    conn = _connect()
+    conn = db.connect()
     try:
         conn.execute("INSERT OR IGNORE INTO known_ips (hostname, ip) VALUES (?,?)", (hostname, ip))
         conn.commit()

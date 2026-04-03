@@ -15,7 +15,7 @@ def init_db() -> None:
     global _initialized
     if _initialized:
         return
-    conn = _connect()
+    conn = connect()
     try:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS hosts (
@@ -74,7 +74,7 @@ def init_db() -> None:
     _initialized = True
 
 
-def _connect() -> sqlite3.Connection:
+def connect() -> sqlite3.Connection:
     os.makedirs(os.path.dirname(_DB_PATH) or ".", exist_ok=True)
     conn = sqlite3.connect(_DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -82,7 +82,7 @@ def _connect() -> sqlite3.Connection:
 
 
 def get_host_registry() -> list[dict[str, Any]]:
-    conn = _connect()
+    conn = connect()
     try:
         rows = conn.execute(
             "SELECT name, ip, group_name, role, check_port, services, link, skip_check FROM hosts"
@@ -108,7 +108,7 @@ def get_host_registry() -> list[dict[str, Any]]:
 
 
 def lookup_known_ip(hostname: str) -> str:
-    conn = _connect()
+    conn = connect()
     try:
         row = conn.execute(
             "SELECT ip FROM known_ips WHERE hostname = ?", (hostname,)

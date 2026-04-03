@@ -182,10 +182,13 @@ export default function App() {
   const hasPrometheus = featureEnabled('prometheus')
   const hasUnifi = featureEnabled('unifi')
 
+  const noIntegrations = featuresData &&
+    Object.values(featuresData).every(v => !(typeof v === 'object' ? v.configured : v))
+
   return (
     <div className="dashboard">
       {anyRefreshing && <div className="updating-bar" />}
-      {featuresData && Object.values(featuresData).every(v => !(typeof v === 'object' ? v.configured : v)) && tab !== 'setup' && (
+      {noIntegrations && tab !== 'setup' && (
         <div className="setup-banner" onClick={() => setTab('setup')}>
           No integrations configured — <strong>click here to run environment discovery</strong>
         </div>

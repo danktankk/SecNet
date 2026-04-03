@@ -245,7 +245,6 @@ from services import environment_scan as env_scan_svc
 from services import env_manager
 import asyncio as _asyncio
 
-_scan_lock = _asyncio.Lock()
 _scan_running = False
 _last_scan: dict | None = None
 
@@ -283,7 +282,7 @@ async def config_update(req: ConfigUpdateRequest):
     return {"status": "ok", "message": msg, "writable": env_manager.env_file_writable()}
 
 
-@router.get("/config/status")
+@router.get("/config/status", dependencies=[Depends(_require_gate)])
 async def config_status():
     return {
         "writable": env_manager.env_file_writable(),

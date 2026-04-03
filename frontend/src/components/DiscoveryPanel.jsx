@@ -15,6 +15,7 @@ function StatusBadge({ status }) {
 function ResultCard({ result, onSave, gateToken }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState(null)
   const [editValues, setEditValues] = useState(result.suggested_values || {})
 
   const canSave = result.status === 'found' &&
@@ -24,6 +25,7 @@ function ResultCard({ result, onSave, gateToken }) {
   async function handleSave() {
     if (!gateToken) return
     setSaving(true)
+    setSaveError(null)
     try {
       const r = await fetch('/api/config/update', {
         method: 'POST',
@@ -37,7 +39,11 @@ function ResultCard({ result, onSave, gateToken }) {
       if (r.ok) {
         setSaved(true)
         if (onSave) onSave(d.message)
+      } else {
+        setSaveError(d.detail || 'Save failed')
       }
+    } catch (e) {
+      setSaveError(String(e))
     } finally {
       setSaving(false)
     }
@@ -88,6 +94,7 @@ function ResultCard({ result, onSave, gateToken }) {
           </button>
         </div>
       )}
+      {saveError && <div className="disc-error" style={{marginTop:'0.4rem'}}>{saveError}</div>}
       {saved && <div className="disc-saved">✓ Saved — restart container to apply</div>}
     </div>
   )
@@ -100,7 +107,7 @@ function Section({ title, icon, results, onSave, gateToken }) {
       <div className="disc-section-header">{icon} {title}</div>
       <div className="disc-cards">
         {results.map((r, i) => (
-          <ResultCard key={i} result={r} onSave={onSave} gateToken={gateToken} />
+          <ResultCard key={r.name || i} result={r} onSave={onSave} gateToken={gateToken} />
         ))}
       </div>
     </div>

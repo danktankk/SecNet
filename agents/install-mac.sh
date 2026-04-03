@@ -29,12 +29,15 @@ if [[ -z "$PYTHON3" ]]; then
   exit 1
 fi
 
-# Install deps via python3 -m pip (works regardless of pip3 PATH)
+# Ensure pip is available (system macOS Python often ships without it)
+"$PYTHON3" -m pip --version &>/dev/null || "$PYTHON3" -m ensurepip --upgrade
+
+# Install deps
 "$PYTHON3" -m pip install --quiet --break-system-packages psutil requests 2>/dev/null || \
   "$PYTHON3" -m pip install --quiet psutil requests
 
 # Download or copy agent
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null || echo /tmp)"
 AGENT_PY="$SCRIPT_DIR/secnet-agent-mac.py"
 if [[ ! -f "$AGENT_PY" ]]; then
   echo "Downloading agent from GitHub..."

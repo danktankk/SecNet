@@ -172,10 +172,11 @@ python agents\secnet-agent.py start
 **What it collects:** CPU, RAM, disk, top 40 processes, SSH auth events (journalctl or `/var/log/auth.log` fallback), distro info.
 
 ```bash
-sudo bash agents/install-linux.sh --url http://YOUR_SECNET:8088 --key YOUR_AGENT_KEY
+curl -fsSL https://raw.githubusercontent.com/danktankk/SecNet/main/agents/install-linux.sh \
+  | sudo bash -s -- --url http://YOUR_SECNET:8088 --key YOUR_AGENT_KEY
 ```
 
-That's it. The script installs `psutil` and `requests`, copies the agent to `/usr/local/bin/secnet-agent`, writes the config, creates the systemd unit, enables it, and starts it.
+That's it. No repo clone needed. The script installs dependencies, downloads the agent, writes the config to `/etc/secnet/agent.json`, creates and enables the systemd unit, and starts the service.
 
 **After install:**
 ```bash
@@ -196,10 +197,11 @@ sudo systemctl disable secnet-agent  # remove from autostart
 **What it collects:** CPU, RAM, disk, top 40 processes, Unified Log security events (securityd, sshd, authentication), macOS version.
 
 ```bash
-sudo bash agents/install-mac.sh --url http://YOUR_SECNET:8088 --key YOUR_AGENT_KEY
+curl -fsSL https://raw.githubusercontent.com/danktankk/SecNet/main/agents/install-mac.sh \
+  | sudo bash -s -- --url http://YOUR_SECNET:8088 --key YOUR_AGENT_KEY
 ```
 
-That's it. The script installs `psutil` and `requests`, copies the agent to `/usr/local/bin/secnet-agent`, writes the config, creates the launchd plist, and loads it.
+That's it. No repo clone needed. The script installs dependencies, downloads the agent, writes the config to `/etc/secnet/agent.json`, creates the launchd plist, and loads it.
 
 **After install:**
 ```bash

@@ -32,7 +32,7 @@ fi
 # Create venv — avoids all system pip / PEP 668 / ensurepip issues
 VENV=/opt/secnet-venv
 "$PYTHON3" -m venv "$VENV"
-"$VENV/bin/pip" install --quiet psutil requests
+"$VENV/bin/python" -m pip install --quiet psutil requests
 
 # Download or copy agent
 SCRIPT_SRC="${BASH_SOURCE[0]:-}"

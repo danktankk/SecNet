@@ -29,15 +29,14 @@ if [[ -z "$PYTHON3" ]]; then
   exit 1
 fi
 
-# Ensure pip is available (system macOS Python often ships without it)
-"$PYTHON3" -m pip --version &>/dev/null || "$PYTHON3" -m ensurepip --upgrade
-
-# Install deps
-"$PYTHON3" -m pip install --quiet --break-system-packages psutil requests 2>/dev/null || \
-  "$PYTHON3" -m pip install --quiet psutil requests
+# Create venv — avoids all system pip / PEP 668 / ensurepip issues
+VENV=/opt/secnet-venv
+"$PYTHON3" -m venv "$VENV"
+"$VENV/bin/pip" install --quiet psutil requests
 
 # Download or copy agent
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null || echo /tmp)"
+SCRIPT_SRC="${BASH_SOURCE[0]:-}"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SRC")" 2>/dev/null && pwd || echo '')"
 AGENT_PY="$SCRIPT_DIR/secnet-agent-mac.py"
 if [[ ! -f "$AGENT_PY" ]]; then
   echo "Downloading agent from GitHub..."
@@ -62,7 +61,7 @@ cat > /Library/LaunchDaemons/com.secnet.agent.plist << PLIST
     <key>Label</key><string>com.secnet.agent</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$PYTHON3</string>
+        <string>/opt/secnet-venv/bin/python</string>
         <string>/usr/local/bin/secnet-agent</string>
         <string>run</string>
     </array>

@@ -22,19 +22,19 @@ if [[ $EUID -ne 0 ]]; then echo "Run with sudo"; exit 1; fi
 
 echo "Installing SecNet agent..."
 
-# Install deps
-# Try apt first (Debian/Ubuntu), fall back to python3 -m pip
+# Ensure python3-venv is available (required on Debian/Ubuntu)
 if command -v apt-get &>/dev/null; then
-  apt-get install -y -q python3-psutil python3-requests 2>/dev/null || \
-    python3 -m pip install --quiet --break-system-packages psutil requests
-else
-  python3 -m pip install --quiet --break-system-packages psutil requests 2>/dev/null || \
-    python3 -m pip install --quiet psutil requests
+  apt-get install -y -q python3-venv python3-full 2>/dev/null || true
 fi
 
-# Download agent
-AGENT_URL="${URL%/}"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Create venv — avoids all system pip / PEP 668 issues
+VENV=/opt/secnet-venv
+python3 -m venv "$VENV"
+"$VENV/bin/pip" install --quiet psutil requests
+
+# Download or copy agent
+SCRIPT_SRC="${BASH_SOURCE[0]:-}"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SRC")" 2>/dev/null && pwd || echo '')"
 AGENT_PY="$SCRIPT_DIR/secnet-agent-linux.py"
 if [[ ! -f "$AGENT_PY" ]]; then
   echo "Downloading agent from GitHub..."
@@ -45,15 +45,13 @@ fi
 cp "$AGENT_PY" /usr/local/bin/secnet-agent
 chmod +x /usr/local/bin/secnet-agent
 
-# Save config
 mkdir -p /etc/secnet
-cat > /etc/secnet/agent.json << EOF
+cat > /etc/secnet/agent.json << CONF
 {"url": "$URL", "key": "$KEY"}
-EOF
+CONF
 chmod 600 /etc/secnet/agent.json
 
-# Create systemd unit
-cat > /etc/systemd/system/secnet-agent.service << EOF
+cat > /etc/systemd/system/secnet-agent.service << UNIT
 [Unit]
 Description=SecNet Monitoring Agent
 After=network-online.target
@@ -61,13 +59,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/secnet-agent run
+ExecStart=/opt/secnet-venv/bin/python /usr/local/bin/secnet-agent run
 Restart=on-failure
 RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
-EOF
+UNIT
 
 systemctl daemon-reload
 systemctl enable secnet-agent

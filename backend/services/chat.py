@@ -105,7 +105,7 @@ TOOLS = [
 ]
 
 
-async def _execute_tool(name: str, args: dict, gate_token: str = "") -> str:
+async def _execute_tool(name: str, args: dict) -> str:
     """Execute a tool call and return the result as a string."""
     from services import environment_scan as env_scan_svc
     from services import env_manager
@@ -118,15 +118,14 @@ async def _execute_tool(name: str, args: dict, gate_token: str = "") -> str:
         except Exception as e:
             return json.dumps({"error": str(e)})
 
-    elif name == "update_config":
+    if name == "update_config":
         updates = args.get("updates", {})
         if not updates:
             return json.dumps({"error": "No updates provided"})
         ok, msg = env_manager.update_env(updates)
         return json.dumps({"success": ok, "message": msg})
 
-    elif name == "get_config_status":
-        from services import env_manager
+    if name == "get_config_status":
         return json.dumps({
             "writable": env_manager.env_file_writable(),
             "env_path": env_manager.ENV_FILE_PATH,
@@ -169,40 +168,36 @@ async def chat(messages: list[dict], session_unlocked: bool, dashboard_context: 
 
     msg = response.choices[0].message
 
-    # Handle tool calls
-    if msg.tool_calls:
-        tool_results = []
-        for tc in msg.tool_calls:
-            try:
-                args = json.loads(tc.function.arguments)
-            except Exception:
-                args = {}
-            logger.info(f"Tool call: {tc.function.name}({args})")
-            result = await _execute_tool(tc.function.name, args)
-            tool_results.append({
-                "tool_call_id": tc.id,
-                "role": "tool",
-                "content": result,
-            })
+    # No tool calls — return content directly
+    if not msg.tool_calls:
+        return msg.content
 
-        # Second pass with tool results
-        full_messages = full_messages + [
-            {"role": "assistant", "content": msg.content, "tool_calls": [
-                {"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
-                for tc in msg.tool_calls
-            ]},
-            *tool_results,
-        ]
+    # Execute tool calls
+    tool_results = []
+    for tc in msg.tool_calls:
+        try:
+            args = json.loads(tc.function.arguments)
+        except Exception:
+            args = {}
+        logger.info(f"Tool call: {tc.function.name}({args})")
+        result = await _execute_tool(tc.function.name, args)
+        tool_results.append({
+            "tool_call_id": tc.id,
+            "role": "tool",
+            "content": result,
+        })
 
-        followup = await client.chat.completions.create(
-            model=settings.openai_model,
-            messages=full_messages,
-            max_tokens=2048,
-            temperature=0.7,
-        )
-        return followup.choices[0].message.content
+    # Second pass with tool results
+    assistant_msg = msg.model_dump(exclude_none=True)
+    full_messages = [*full_messages, assistant_msg, *tool_results]
 
-    return msg.content
+    followup = await client.chat.completions.create(
+        model=settings.openai_model,
+        messages=full_messages,
+        max_tokens=2048,
+        temperature=0.7,
+    )
+    return followup.choices[0].message.content
 
 
 def check_gate_answer(answer: str) -> bool:

@@ -243,7 +243,6 @@ async def workstations():
 
 from services import environment_scan as env_scan_svc
 from services import env_manager
-import asyncio as _asyncio
 
 _scan_running = False
 _last_scan: dict | None = None

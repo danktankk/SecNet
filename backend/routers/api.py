@@ -263,7 +263,7 @@ async def discovery_scan(include_subnet: bool = True):
     async with _scan_lock:
         result = await env_scan_svc.run_scan(include_subnet=include_subnet)
         _last_scan = result
-        return {"status": "complete", **result}
+    return {"status": "complete", **result}
 
 
 @router.get("/discovery/last", dependencies=[Depends(_require_gate)])

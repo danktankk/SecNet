@@ -28,6 +28,7 @@ import socket
 import subprocess
 import sys
 import time
+import threading
 import logging
 import signal
 
@@ -40,19 +41,21 @@ INSTALL_PATH = '/usr/local/bin/secnet-agent'
 PLIST_PATH = '/Library/LaunchDaemons/com.secnet.agent.plist'
 LOG_FILE = '/var/log/secnet-agent.log'
 
-AGENT_VERSION = "0.11.0"
+AGENT_VERSION = "0.11.1"
 INTERVAL = 30
 MAX_PROCS = 40
 MAX_EVENTS = 30
 
+# Logical CPU count for normalizing per-process cpu_percent
+_cpu_count = psutil.cpu_count(logical=True) or 1
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 log = logging.getLogger('secnet-agent')
-_running = True
+_stop = threading.Event()
 
 
 def _handle_signal(signum, frame):
-    global _running
-    _running = False
+    _stop.set()
 
 
 def load_config():
@@ -87,7 +90,7 @@ def get_processes():
         try:
             i = p.info
             procs.append({'name': i['name'] or '', 'pid': i['pid'],
-                          'cpu': round(i['cpu_percent'] or 0, 1),
+                          'cpu': round((i['cpu_percent'] or 0) / _cpu_count, 1),
                           'ram': int((i['memory_info'].rss if i['memory_info'] else 0) / 1048576)})
         except: continue
     procs.sort(key=lambda x: x['cpu'], reverse=True)
@@ -128,7 +131,7 @@ def collect():
         'hostname': socket.gethostname(), 'ip': ip, 'mac': mac_addr,
         'os': f"macOS {mac_ver}" if mac_ver else f"macOS {platform.release()}",
         'domain': '', 'user': user, 'session_start': ss,
-        'cpu': int(psutil.cpu_percent(interval=1)),
+        'cpu': int(psutil.cpu_percent(interval=None)),
         'ram': int(psutil.virtual_memory().percent),
         'disk': int(psutil.disk_usage('/').percent),
         'processes': get_processes(), 'events': get_events(),
@@ -141,18 +144,22 @@ def report(url, key, payload):
 
 
 def agent_loop(url, key):
-    global _running
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
     log.info(f'Reporting to {url} every {INTERVAL}s')
-    while _running:
+    # Prime CPU measurement counters — first non-blocking call always returns 0.0
+    psutil.cpu_percent(interval=None)
+    for p in psutil.process_iter():
+        try: p.cpu_percent(interval=None)
+        except: pass
+    # First wait establishes the measurement window for cpu_percent(interval=None)
+    _stop.wait(INTERVAL)
+    while not _stop.is_set():
         try:
             resp = report(url, key, collect())
             log.info(f'Reported {socket.gethostname()} — {resp.get("status","?")}')
         except Exception as e: log.error(f'Report failed: {e}')
-        for _ in range(INTERVAL):
-            if not _running: break
-            time.sleep(1)
+        _stop.wait(INTERVAL)
 
 
 LAUNCHD_PLIST_CONTENT = """<?xml version="1.0" encoding="UTF-8"?>
@@ -162,7 +169,7 @@ LAUNCHD_PLIST_CONTENT = """<?xml version="1.0" encoding="UTF-8"?>
     <key>Label</key><string>com.secnet.agent</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/python3</string>
+        <string>/opt/secnet-venv/bin/python</string>
         <string>/usr/local/bin/secnet-agent</string>
         <string>run</string>
     </array>

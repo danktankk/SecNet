@@ -17,7 +17,7 @@ Or manually:
   sudo launchctl load /Library/LaunchDaemons/com.secnet.agent.plist
 
 Config:  /etc/secnet/agent.json
-Logs:    /var/log/secnet-agent.log
+Logs:    /Library/Logs/secnet-agent.log
 """
 import argparse
 import json
@@ -39,7 +39,7 @@ CONFIG_DIR = '/etc/secnet'
 CONFIG_FILE = os.path.join(CONFIG_DIR, 'agent.json')
 INSTALL_PATH = '/usr/local/bin/secnet-agent'
 PLIST_PATH = '/Library/LaunchDaemons/com.secnet.agent.plist'
-LOG_FILE = '/var/log/secnet-agent.log'
+LOG_FILE = '/Library/Logs/secnet-agent.log'
 
 AGENT_VERSION = "0.11.1"
 INTERVAL = 30
@@ -175,8 +175,8 @@ LAUNCHD_PLIST_CONTENT = """<?xml version="1.0" encoding="UTF-8"?>
     </array>
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key><true/>
-    <key>StandardOutPath</key><string>/var/log/secnet-agent.log</string>
-    <key>StandardErrorPath</key><string>/var/log/secnet-agent.log</string>
+    <key>StandardOutPath</key><string>/Library/Logs/secnet-agent.log</string>
+    <key>StandardErrorPath</key><string>/Library/Logs/secnet-agent.log</string>
     <key>ThrottleInterval</key><integer>10</integer>
 </dict>
 </plist>

@@ -1,3 +1,4 @@
+export const NET_GATE_KEY = 'security_gate_net'
 const TTL = 30 * 60 * 1000  // 30 minutes
 export const TOKEN_KEY = 'security_gate_token'
 

@@ -1,31 +1,23 @@
 import React, { useState } from 'react'
-import type {
-  DiscoveryResult,
-  DiscoveryStatus,
-  ScanResponse,
-  ConfigUpdateResponse,
-  StatusDisplay,
-  SaveState,
-} from '../types/discovery'
 
 // ── Static config (module scope, never rebuilt) ───────────────────────────────
 
-const STATUS_DISPLAY: Record<DiscoveryStatus, StatusDisplay> = {
+const STATUS_DISPLAY = {
   found:              { label: 'Found',      className: 'disc-found' },
   already_configured: { label: 'Configured', className: 'disc-configured' },
   not_found:          { label: 'Not Found',  className: 'disc-missing' },
   partial:            { label: 'Partial',    className: 'disc-partial' },
 }
 
-const DEFAULT_SAVE_STATE: SaveState = { saving: false, saved: false, error: null }
+const DEFAULT_SAVE_STATE = { saving: false, saved: false, error: null }
 
 // ── Pure data functions (no JSX) ──────────────────────────────────────────────
 
-function getStatusDisplay(status: DiscoveryStatus): StatusDisplay {
+function getStatusDisplay(status) {
   return STATUS_DISPLAY[status] ?? STATUS_DISPLAY.not_found
 }
 
-function canSave(result: DiscoveryResult, saved: boolean): boolean {
+function canSave(result, saved) {
   return (
     !saved &&
     result.status === 'found' &&
@@ -33,16 +25,16 @@ function canSave(result: DiscoveryResult, saved: boolean): boolean {
   )
 }
 
-function countFound(results: ScanResponse): number {
+function countFound(results) {
   return [...results.gateway, ...results.network].filter(r => r.status === 'found').length
 }
 
-function countUnconfigured(results: ScanResponse): number {
+function countUnconfigured(results) {
   return results.config.filter(r => r.status === 'not_found').length
 }
 
-function buildScanSummary(results: ScanResponse): string {
-  const parts: string[] = [`Scan completed in ${results.scan_duration_seconds}s`]
+function buildScanSummary(results) {
+  const parts = [`Scan completed in ${results.scan_duration_seconds}s`]
   if (results.gateway_ip) parts.push(`Gateway: ${results.gateway_ip}`)
   const found = countFound(results)
   if (found > 0) parts.push(`${found} new service${found !== 1 ? 's' : ''} found`)
@@ -51,14 +43,11 @@ function buildScanSummary(results: ScanResponse): string {
   return parts.join(' · ')
 }
 
-function errorMessage(err: unknown): string {
+function errorMessage(err) {
   return err instanceof Error ? err.message : String(err)
 }
 
-async function postConfigUpdate(
-  updates: Record<string, string>,
-  gateToken: string,
-): Promise<ConfigUpdateResponse> {
+async function postConfigUpdate(updates, gateToken) {
   const res = await fetch('/api/config/update', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Gate-Token': gateToken },
@@ -66,62 +55,38 @@ async function postConfigUpdate(
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Save failed' }))
-    throw new Error((err as { detail?: string }).detail ?? 'Save failed')
+    throw new Error(err.detail ?? 'Save failed')
   }
-  return res.json() as Promise<ConfigUpdateResponse>
+  return res.json()
 }
 
-async function postScan(includeSubnet: boolean, gateToken: string): Promise<ScanResponse> {
+async function postScan(includeSubnet, gateToken) {
   const res = await fetch(`/api/discovery/scan?include_subnet=${includeSubnet}`, {
     method: 'POST',
     headers: { 'X-Gate-Token': gateToken },
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Scan failed' }))
-    throw new Error((err as { detail?: string }).detail ?? 'Scan failed')
+    throw new Error(err.detail ?? 'Scan failed')
   }
-  return res.json() as Promise<ScanResponse>
-}
-
-// ── Component prop interfaces ─────────────────────────────────────────────────
-
-interface StatusBadgeProps {
-  status: DiscoveryStatus
-}
-
-interface ResultCardProps {
-  result: DiscoveryResult
-  gateToken: string
-  onSaved: (message: string) => void
-}
-
-interface SectionProps {
-  title: string
-  icon: string
-  results: DiscoveryResult[]
-  gateToken: string
-  onSaved: (message: string) => void
-}
-
-interface DiscoveryPanelProps {
-  gateToken: string
+  return res.json()
 }
 
 // ── Components ────────────────────────────────────────────────────────────────
 
-const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+function StatusBadge({ status }) {
   const { label, className } = getStatusDisplay(status)
   return <span className={`disc-badge ${className}`}>{label}</span>
 }
 
-const ResultCard: React.FC<ResultCardProps> = ({ result, gateToken, onSaved }) => {
-  const [saveState, setSaveState] = useState<SaveState>(DEFAULT_SAVE_STATE)
-  const [editValues, setEditValues] = useState<Record<string, string>>(result.suggested_values ?? {})
+function ResultCard({ result, gateToken, onSaved }) {
+  const [saveState, setSaveState] = useState(DEFAULT_SAVE_STATE)
+  const [editValues, setEditValues] = useState(result.suggested_values ?? {})
 
   const showSaveForm = canSave(result, saveState.saved)
   const missingKeys = result.env_keys.filter(k => !editValues[k])
 
-  async function handleSave(): Promise<void> {
+  async function handleSave() {
     if (!gateToken) return
     setSaveState({ saving: true, saved: false, error: null })
     try {
@@ -133,7 +98,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, gateToken, onSaved }) =
     }
   }
 
-  function handleValueChange(key: string, value: string): void {
+  function handleValueChange(key, value) {
     setEditValues(prev => ({ ...prev, [key]: value }))
   }
 
@@ -186,7 +151,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, gateToken, onSaved }) =
   )
 }
 
-const Section: React.FC<SectionProps> = ({ title, icon, results, gateToken, onSaved }) => {
+function Section({ title, icon, results, gateToken, onSaved }) {
   if (!results.length) return null
   return (
     <div className="disc-section">
@@ -200,14 +165,14 @@ const Section: React.FC<SectionProps> = ({ title, icon, results, gateToken, onSa
   )
 }
 
-export default function DiscoveryPanel({ gateToken }: DiscoveryPanelProps): React.ReactElement {
+export default function DiscoveryPanel({ gateToken }) {
   const [scanning, setScanning] = useState(false)
-  const [results, setResults] = useState<ScanResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [saveNotice, setSaveNotice] = useState<string | null>(null)
+  const [results, setResults] = useState(null)
+  const [error, setError] = useState(null)
+  const [saveNotice, setSaveNotice] = useState(null)
   const [includeSubnet, setIncludeSubnet] = useState(true)
 
-  async function runScan(): Promise<void> {
+  async function runScan() {
     setScanning(true)
     setError(null)
     setSaveNotice(null)

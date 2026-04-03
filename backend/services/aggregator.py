@@ -263,30 +263,6 @@ async def get_threat_intel() -> dict:
     }
 
 
-async def get_kanban() -> dict[str, list[dict]]:
-    decisions = await get_decisions_with_geo()
-
-    mitigated = []
-    problematic = []
-    critical = []
-
-    for d in decisions:
-        _, severity = _classify_attack(d.get("reason", ""))
-        entry = {**d, "status": severity, "severity": severity}
-        if severity == "critical":
-            critical.append(entry)
-        elif severity in ("high", "medium"):
-            problematic.append(entry)
-        else:
-            mitigated.append(entry)
-
-    return {
-        "mitigated": mitigated[:50],
-        "problematic": problematic[:50],
-        "critical": critical[:50],
-    }
-
-
 async def get_timeline(range_hours: int = 24) -> list[dict]:
     end = int(time.time())
     start = end - range_hours * 3600

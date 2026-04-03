@@ -11,6 +11,7 @@ INSTALL_EXE = os.path.join(PROGRAM_DIR, 'secnet-agent.exe')
 SERVICE_NAME = 'SecNetAgent'
 SERVICE_DISPLAY = 'SecNet Monitoring Agent'
 SERVICE_DESC = 'Reports workstation health and security events to SecNet dashboard'
+AGENT_VERSION = "0.11.0"
 INTERVAL = 30
 MAX_PROCS = 40
 MAX_EVENTS = 30

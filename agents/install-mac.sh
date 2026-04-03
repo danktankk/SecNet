@@ -22,37 +22,50 @@ if [[ $EUID -ne 0 ]]; then echo "Run with sudo"; exit 1; fi
 
 echo "Installing SecNet agent..."
 
-# Find python3
-PYTHON3=$(command -v python3 || command -v python || true)
+# Find python3 — probe known locations because sudo resets PATH on macOS
+PYTHON3=$(command -v python3 \
+  || ls /opt/homebrew/bin/python3 2>/dev/null \
+  || ls /usr/local/bin/python3 2>/dev/null \
+  || command -v python \
+  || true)
 if [[ -z "$PYTHON3" ]]; then
   echo "ERROR: python3 not found. Install it with: brew install python3"
   exit 1
 fi
+echo "  Python: $PYTHON3"
 
-# Create venv — avoids all system pip / PEP 668 / ensurepip issues
+# Create venv — rm -rf first avoids --clear failures when prior Python was upgraded
 VENV=/opt/secnet-venv
+echo "  Creating venv at $VENV..."
+rm -rf "$VENV"
 "$PYTHON3" -m venv "$VENV"
-"$VENV/bin/python" -m pip install --quiet psutil requests
+echo "  Installing psutil requests..."
+"$VENV/bin/python" -m pip install -q --upgrade psutil requests
+echo "  Dependencies installed."
 
 # Download or copy agent
-SCRIPT_SRC="${BASH_SOURCE[0]:-}"
+SCRIPT_SRC="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SRC")" 2>/dev/null && pwd || echo '')"
 AGENT_PY="$SCRIPT_DIR/secnet-agent-mac.py"
 if [[ ! -f "$AGENT_PY" ]]; then
-  echo "Downloading agent from GitHub..."
+  echo "  Downloading agent from GitHub..."
   curl -fsSL "https://raw.githubusercontent.com/danktankk/SecNet/main/agents/secnet-agent-mac.py" \
     -o /tmp/secnet-agent-mac.py || { echo "ERROR: download failed"; exit 1; }
   AGENT_PY="/tmp/secnet-agent-mac.py"
 fi
 cp "$AGENT_PY" /usr/local/bin/secnet-agent
 chmod +x /usr/local/bin/secnet-agent
+echo "  Agent installed to /usr/local/bin/secnet-agent"
 
+# Write config
 mkdir -p /etc/secnet
 cat > /etc/secnet/agent.json << CONF
 {"url": "$URL", "key": "$KEY"}
 CONF
 chmod 600 /etc/secnet/agent.json
+echo "  Config written."
 
+# Write plist
 cat > /Library/LaunchDaemons/com.secnet.agent.plist << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -67,16 +80,24 @@ cat > /Library/LaunchDaemons/com.secnet.agent.plist << PLIST
     </array>
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key><true/>
-    <key>StandardOutPath</key><string>/var/log/secnet-agent.log</string>
-    <key>StandardErrorPath</key><string>/var/log/secnet-agent.log</string>
+    <key>StandardOutPath</key><string>/Library/Logs/secnet-agent.log</string>
+    <key>StandardErrorPath</key><string>/Library/Logs/secnet-agent.log</string>
     <key>ThrottleInterval</key><integer>10</integer>
 </dict>
 </plist>
 PLIST
 
-launchctl load /Library/LaunchDaemons/com.secnet.agent.plist
+# Unload/unbootstrap existing service if present (idempotent reinstall)
+launchctl bootout system /Library/LaunchDaemons/com.secnet.agent.plist 2>/dev/null || true
+
+# Bootstrap service (correct method for macOS 11+ system daemons)
+launchctl bootstrap system /Library/LaunchDaemons/com.secnet.agent.plist || {
+  echo "ERROR: launchctl bootstrap failed."
+  echo "  Check: sudo launchctl print system/com.secnet.agent"
+  exit 1
+}
 
 echo ""
 echo "Done. Service loaded."
-echo "Check: launchctl list com.secnet.agent"
-echo "Logs:  tail -f /var/log/secnet-agent.log"
+echo "  Status: launchctl list com.secnet.agent"
+echo "  Logs:   tail -f /Library/Logs/secnet-agent.log"

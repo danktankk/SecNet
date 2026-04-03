@@ -4,7 +4,6 @@ from __future__ import annotations
 import re
 import time
 import asyncio
-from typing import Any
 from cachetools import TTLCache
 from services import data_layer as dl
 
@@ -18,7 +17,7 @@ def _is_public(ip: str) -> bool:
     return not _PRIVATE_RE.match(ip)
 
 
-async def get_summary() -> dict[str, Any]:
+async def get_summary() -> dict:
     if "summary" in _summary_cache:
         return _summary_cache["summary"]
 

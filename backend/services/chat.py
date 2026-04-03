@@ -122,7 +122,7 @@ async def _execute_tool(name: str, args: dict) -> str:
     if name == "run_environment_scan":
         include_subnet = args.get("include_subnet", True)
         try:
-            result = await env_scan_svc.run_scan(include_subnet=include_subnet)
+            result = await env_scan_svc.run_scan_locked(include_subnet=include_subnet)
             return json.dumps(result, default=str)
         except Exception as e:
             return json.dumps({"error": str(e)})

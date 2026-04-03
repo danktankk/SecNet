@@ -54,17 +54,6 @@ async def get_summary() -> dict[str, Any]:
     # Threat level based on locally detected attacks only, not community blocklist noise
     local_decisions = [d for d in decisions if d.get("origin") not in ("CAPI", "lists", "cscli")]
 
-    # De-duplicate: one entry per IP, pick highest-severity scenario seen
-    _HIGH_KW = ("cve", "exploit", "backdoor", "log4j", "shellshock", "rce",
-                "ssh-bf", "ftp-bf", "-bf", "brute", "credential", "rdp")
-    seen_critical_ips: set[str] = set()
-    for d in local_decisions:
-        sc = d.get("scenario", d.get("reason", "")).lower()
-        if "wordpress" in sc:
-            continue  # wordpress scan is low severity regardless
-        if any(k in sc for k in _HIGH_KW):
-            seen_critical_ips.add(d.get("value", ""))
-    seen_critical_ips.discard("")
 
     local_unique_ips = len({d.get("value", "") for d in local_decisions} - {""})
 

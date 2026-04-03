@@ -22,9 +22,18 @@ if [[ $EUID -ne 0 ]]; then echo "Run with sudo"; exit 1; fi
 
 echo "Installing SecNet agent..."
 
-pip3 install --quiet --break-system-packages psutil requests 2>/dev/null || \
-  pip install --quiet --break-system-packages psutil requests
+# Find python3
+PYTHON3=$(command -v python3 || command -v python || true)
+if [[ -z "$PYTHON3" ]]; then
+  echo "ERROR: python3 not found. Install it with: brew install python3"
+  exit 1
+fi
 
+# Install deps via python3 -m pip (works regardless of pip3 PATH)
+"$PYTHON3" -m pip install --quiet --break-system-packages psutil requests 2>/dev/null || \
+  "$PYTHON3" -m pip install --quiet psutil requests
+
+# Download or copy agent
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 AGENT_PY="$SCRIPT_DIR/secnet-agent-mac.py"
 if [[ ! -f "$AGENT_PY" ]]; then
@@ -37,12 +46,12 @@ cp "$AGENT_PY" /usr/local/bin/secnet-agent
 chmod +x /usr/local/bin/secnet-agent
 
 mkdir -p /etc/secnet
-cat > /etc/secnet/agent.json << EOF
+cat > /etc/secnet/agent.json << CONF
 {"url": "$URL", "key": "$KEY"}
-EOF
+CONF
 chmod 600 /etc/secnet/agent.json
 
-cat > /Library/LaunchDaemons/com.secnet.agent.plist << EOF
+cat > /Library/LaunchDaemons/com.secnet.agent.plist << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -50,7 +59,7 @@ cat > /Library/LaunchDaemons/com.secnet.agent.plist << EOF
     <key>Label</key><string>com.secnet.agent</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/python3</string>
+        <string>$PYTHON3</string>
         <string>/usr/local/bin/secnet-agent</string>
         <string>run</string>
     </array>
@@ -61,7 +70,7 @@ cat > /Library/LaunchDaemons/com.secnet.agent.plist << EOF
     <key>ThrottleInterval</key><integer>10</integer>
 </dict>
 </plist>
-EOF
+PLIST
 
 launchctl load /Library/LaunchDaemons/com.secnet.agent.plist
 

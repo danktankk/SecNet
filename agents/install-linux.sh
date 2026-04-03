@@ -23,7 +23,14 @@ if [[ $EUID -ne 0 ]]; then echo "Run with sudo"; exit 1; fi
 echo "Installing SecNet agent..."
 
 # Install deps
-pip3 install --quiet psutil requests 2>/dev/null || pip install --quiet psutil requests
+# Try apt first (Debian/Ubuntu), fall back to pip with --break-system-packages
+if command -v apt-get &>/dev/null; then
+  apt-get install -y -q python3-psutil python3-requests 2>/dev/null || \
+    pip3 install --quiet --break-system-packages psutil requests
+else
+  pip3 install --quiet --break-system-packages psutil requests 2>/dev/null || \
+    pip install --quiet --break-system-packages psutil requests
+fi
 
 # Download agent
 AGENT_URL="${URL%/}"

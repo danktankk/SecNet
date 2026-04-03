@@ -112,130 +112,118 @@ Open `http://localhost:8088` (or your host IP on port 8088).
 
 ## Workstation Agents
 
-Lightweight agents report system stats, top processes, and security events to the Workstations tab every 30 seconds. Each platform agent runs as a native OS service -- no terminal windows to keep open.
+Lightweight agents report system stats, running processes, and security events to the Workstations tab every 30 seconds. Each agent runs as a native OS service — starts on boot, restarts on failure, no terminal window required.
 
-### Prerequisites (all platforms)
-
-```bash
-pip install psutil requests
-```
-
-Set `WORKSTATION_AGENT_KEY` in your SecNet `.env` and `ENABLE_WORKSTATIONS=true` (default).
+Before installing: set `WORKSTATION_AGENT_KEY` in your SecNet `.env` on the server. That key goes into the install command below. `ENABLE_WORKSTATIONS=true` is the default.
 
 ---
 
 ### Windows
 
-**Requirements:** Python 3.10+, `pywin32` (`pip install pywin32`)
+Download the latest `secnet-agent.exe` from the [Releases](https://github.com/danktankk/SecNet/releases/latest) page.
 
-**What it collects:** CPU, RAM, disk, top 40 processes, Windows Security Event Log (logon, logon failures, privilege escalation, service installs), AD domain.
+1. **Right-click → Run as administrator**
+2. Enter your SecNet URL and agent key, click **Save Config & Test Connection**
+3. Click **Install**, then **Start**
 
-```powershell
-# 1. Install dependencies
-pip install psutil requests pywin32
+The GUI manages the Windows service. Come back to it any time to stop, restart, or remove the agent.
 
-# 2. Configure (run as Administrator)
-python agents\secnet-agent.py setup --url http://YOUR_SECNET:8088 --key YOUR_AGENT_KEY
+**What it collects:** CPU, RAM, disk, top 40 processes (normalized CPU%), Windows Security Event Log (logon events, failures, privilege escalation, service installs), AD domain.
 
-# 3. Install as Windows service (run as Administrator)
-python agents\secnet-agent.py install
-
-# 4. Start the service
-python agents\secnet-agent.py start
-```
-
-**Management commands:**
-
-| Command | Description |
-|---------|-------------|
-| `secnet-agent.py setup --url URL --key KEY` | Create/update config at `C:\ProgramData\SecNet\agent.json` |
-| `secnet-agent.py install` | Install Windows service (requires admin) |
-| `secnet-agent.py start` | Start the service |
-| `secnet-agent.py stop` | Stop the service |
-| `secnet-agent.py remove` | Uninstall the service |
-| `secnet-agent.py run` | Run in foreground (console mode, for testing) |
-| `secnet-agent.py status` | Show config, connection, and service status |
-
-**Config file:** `C:\ProgramData\SecNet\agent.json`
-**Service log:** `C:\ProgramData\SecNet\agent.log`
+**Config:** `C:\ProgramData\SecNet\agent.json`
+**Log:** `C:\ProgramData\SecNet\agent.log` (rotates at 5 MB, keeps 3 backups)
 **Service name:** `SecNetAgent` (visible in `services.msc`)
 
-**Troubleshooting:**
-- "Access denied" on install/start -> run PowerShell as Administrator
-- Service won't start -> check `C:\ProgramData\SecNet\agent.log` and run `secnet-agent.py status`
-- `pywin32` not found -> run `python Scripts/pywin32_postinstall.py -install` after pip install
+**Updating:** Download the new EXE, run as administrator, click Stop → Remove → Install → Start. Your config is preserved.
 
 ---
 
 ### Linux
 
-**What it collects:** CPU, RAM, disk, top 40 processes, SSH auth events (journalctl or `/var/log/auth.log` fallback), distro info.
+One command installs everything: Python venv, psutil/requests, the agent, systemd unit, and starts the service.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danktankk/SecNet/main/agents/install-linux.sh \
   | sudo bash -s -- --url http://YOUR_SECNET:8088 --key YOUR_AGENT_KEY
 ```
 
-That's it. No repo clone needed. The script installs dependencies, downloads the agent, writes the config to `/etc/secnet/agent.json`, creates and enables the systemd unit, and starts the service.
+**What it collects:** CPU, RAM, disk, top 40 processes (normalized CPU%), SSH auth events from journalctl (falls back to `/var/log/auth.log`), distro info.
 
 **After install:**
 ```bash
-sudo systemctl status secnet-agent   # check it's running
-journalctl -u secnet-agent -f        # tail logs
-sudo systemctl stop secnet-agent     # stop
-sudo systemctl disable secnet-agent  # remove from autostart
+sudo systemctl status secnet-agent    # is it running?
+journalctl -u secnet-agent -f         # live logs
+sudo systemctl restart secnet-agent   # restart
+sudo systemctl disable secnet-agent   # remove from autostart
 ```
 
-**Config file:** `/etc/secnet/agent.json` (mode 0600)
-**Service unit:** `/etc/systemd/system/secnet-agent.service`
+**Updating an existing install:**
+```bash
+sudo curl -fsSL https://raw.githubusercontent.com/danktankk/SecNet/main/agents/secnet-agent-linux.py \
+  -o /usr/local/bin/secnet-agent && sudo systemctl restart secnet-agent
+```
+
+**Config:** `/etc/secnet/agent.json` (0600)
+**Service:** `/etc/systemd/system/secnet-agent.service`
 **Logs:** `journalctl -u secnet-agent -f`
 
 ---
 
 ### macOS
 
-**What it collects:** CPU, RAM, disk, top 40 processes, Unified Log security events (securityd, sshd, authentication), macOS version.
+One command installs everything: Python venv, psutil/requests, the agent, launchd plist, and loads the service.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danktankk/SecNet/main/agents/install-mac.sh \
   | sudo bash -s -- --url http://YOUR_SECNET:8088 --key YOUR_AGENT_KEY
 ```
 
-That's it. No repo clone needed. The script installs dependencies, downloads the agent, writes the config to `/etc/secnet/agent.json`, creates the launchd plist, and loads it.
+**What it collects:** CPU, RAM, disk, top 40 processes (normalized CPU%), Unified Log security events (securityd, sshd, authentication), macOS version.
 
 **After install:**
 ```bash
-tail -f /var/log/secnet-agent.log                                      # logs
-sudo launchctl unload /Library/LaunchDaemons/com.secnet.agent.plist   # stop
-sudo launchctl load /Library/LaunchDaemons/com.secnet.agent.plist     # start
+tail -f /Library/Logs/secnet-agent.log                                          # live logs
+sudo launchctl bootout system /Library/LaunchDaemons/com.secnet.agent.plist     # stop
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.secnet.agent.plist   # start
+launchctl list com.secnet.agent                                                  # status
 ```
 
-**Config file:** `/etc/secnet/agent.json` (mode 0600)
+**Updating or reinstalling:** Re-run the same install command. The script tears down the existing service, rebuilds the venv, and reloads cleanly.
+
+**Config:** `/etc/secnet/agent.json` (0600)
 **Plist:** `/Library/LaunchDaemons/com.secnet.agent.plist`
-**Log file:** `/var/log/secnet-agent.log`
+**Log:** `/Library/Logs/secnet-agent.log`
+
+**macOS troubleshooting:**
+
+| Symptom | Fix |
+|---------|-----|
+| `Bad file descriptor` | Don't use `sudo bash <(...)`. Use the pipe form: `curl ... | sudo bash -s -- --url ...` |
+| `python3 not found` | Install Python: `brew install python3`, then rerun the install command |
+| `launchctl bootstrap failed` | Run `sudo launchctl bootout system /Library/LaunchDaemons/com.secnet.agent.plist` then rerun install |
+| Service loaded but not reporting | Check `tail -f /Library/Logs/secnet-agent.log` for connection errors; verify URL and key |
+| `/usr/local/bin: No such file` | The install script creates this directory automatically — rerun and it will succeed |
+
+> **Note:** Requires macOS 11 (Big Sur) or later. Uses `launchctl bootstrap` — the correct method for system daemons on modern macOS.
 
 ---
 
-### Agent Architecture
+### How the agents work
 
-All three agents share the same design:
+All three share the same design:
 
-1. **Config file** (`agent.json`) stores the dashboard URL and API key. Created once with `setup`, read on every start. No command-line args needed after setup.
-2. **Native service** (Windows Service / systemd / launchd) starts automatically on boot, restarts on failure, logs to the OS logging system.
-3. **30-second loop** collects system stats, top processes, and platform-specific security events, then POSTs to `/api/workstations/report`.
-4. **Graceful shutdown** responds to OS stop signals (SIGTERM, service stop) within 1 second.
-5. **Legacy mode** still supported: `python agent.py --url URL --key KEY` works for quick testing without setup/install.
+- **Config file** stores the dashboard URL and agent key. Written once at install, read on every start.
+- **Native service** (Windows Service / systemd / launchd) starts automatically on boot and restarts on failure.
+- **30-second loop** collects stats and POSTs to `/api/workstations/report`. CPU is measured over the full 30-second window — not a blocking 1-second sample — so the agent uses negligible CPU itself.
+- **Graceful shutdown** on SIGTERM or service stop, no zombie processes.
 
 ```
-  Workstation                          SecNet Server
-  +-----------+     POST /api/         +-------------+
-  |  Agent    | ---> workstations/ --> |  Dashboard   |
-  |  (service)|     report             |  :8088       |
-  +-----------+     every 30s          +-------------+
-       |                                     |
-  OS events,                           Workstations tab
-  processes,                           shows live data
-  CPU/RAM/disk
+  Workstation                         SecNet Server
+  +----------+   POST every 30s       +------------+
+  |  Agent   | ---------------------->| :8088      |
+  | (service)|  /api/workstations/    | Workstations|
+  +----------+  report                | tab        |
+                                      +------------+
 ```
 
 ## Configuration

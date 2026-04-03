@@ -8,7 +8,8 @@ from cachetools import TTLCache
 from services import data_layer as dl
 
 _summary_cache: TTLCache = TTLCache(maxsize=1, ttl=12)
-_breakdown_cache: TTLCache = TTLCache(maxsize=1, ttl=300)
+_breakdown_cache: TTLCache = TTLCache(maxsize=1, ttl=60)
+_threat_intel_cache: TTLCache = TTLCache(maxsize=1, ttl=60)
 
 _PRIVATE_RE = re.compile(r"^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.)")
 
@@ -209,6 +210,8 @@ def _classify_attack(scenario: str) -> tuple[str, str]:
 
 async def get_threat_intel() -> dict:
     """Return structured threat intelligence: community shield vs locally detected."""
+    if "threat_intel" in _threat_intel_cache:
+        return _threat_intel_cache["threat_intel"]
     decisions = await dl.get_decisions()
 
     community_blocks = 0
@@ -242,13 +245,15 @@ async def get_threat_intel() -> dict:
     has_brute_force = any(g["severity"] == "critical" for g in sorted_groups)
     has_high = any(g["severity"] in ("critical", "high") for g in sorted_groups)
 
-    return {
+    result = {
         "community_blocks": community_blocks,
         "local_total": len(local_detections),
         "groups": sorted_groups,
         "has_brute_force": has_brute_force,
         "has_high_severity": has_high,
     }
+    _threat_intel_cache["threat_intel"] = result
+    return result
 
 
 async def get_timeline(range_hours: int = 24) -> list[dict]:

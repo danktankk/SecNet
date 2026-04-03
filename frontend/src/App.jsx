@@ -10,6 +10,8 @@ import NetworkInventory from './components/NetworkInventory'
 import NetworkHealth from './components/NetworkHealth'
 import Workstations from './components/Workstations'
 import SecurityBreakdown from './components/SecurityBreakdown'
+import DiscoveryPanel from './components/DiscoveryPanel'
+import { TOKEN_KEY } from './utils/gate'
 
 // feature: null = always shown
 // feature: string = show if that feature is enabled
@@ -20,6 +22,7 @@ const ALL_TABS = [
   { id: 'network',        label: 'Network',         icon: '\u25C8', feature: 'unifi' },
   { id: 'workstations',   label: 'Workstations',    icon: '\u25FB', feature: 'workstations' },
   { id: 'logs',           label: 'Logs',            icon: '\u25A4', feature: ['crowdsec', 'loki', 'unifi'] },
+  { id: 'setup',          label: 'Setup',           icon: '\u25CE', feature: null },
 ]
 
 const LEVEL_CONFIG = {
@@ -104,6 +107,17 @@ export default function App() {
   const [live, setLive] = useState(null)
   const [tab, setTab] = useState('security')
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [gateToken, setGateToken] = useState(() => sessionStorage.getItem(TOKEN_KEY) || '')
+
+  // Refresh gate token when session storage changes (after gate unlock)
+  useEffect(() => {
+    const poll = setInterval(() => {
+      const t = sessionStorage.getItem(TOKEN_KEY) || ''
+      setGateToken(prev => prev !== t ? t : prev)
+    }, 2000)
+    return () => clearInterval(poll)
+  }, [])
+
   const [lightMode, setLightMode] = useState(() => {
     const stored = localStorage.getItem('theme') === 'light'
     if (stored) document.body.classList.add('light-mode')
@@ -171,6 +185,11 @@ export default function App() {
   return (
     <div className="dashboard">
       {anyRefreshing && <div className="updating-bar" />}
+      {featuresData && Object.values(featuresData).every(v => !(typeof v === 'object' ? v.configured : v)) && tab !== 'setup' && (
+        <div className="setup-banner" onClick={() => setTab('setup')}>
+          No integrations configured — <strong>click here to run environment discovery</strong>
+        </div>
+      )}
       <div className="header">
         <h1>Security Posture &amp; Network Operations {'\u00B7'} Real-Time Monitoring</h1>
         <div className="meta">
@@ -238,6 +257,8 @@ export default function App() {
       {tab === 'network' && <NetworkHealth />}
 
       {tab === 'workstations' && <Workstations />}
+
+      {tab === 'setup' && <DiscoveryPanel gateToken={gateToken} />}
 
       {tab === 'logs' && (
         <div className="feed-row feed-row-4">

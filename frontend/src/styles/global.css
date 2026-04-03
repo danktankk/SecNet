@@ -1510,3 +1510,204 @@ body {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
+
+/* ── Setup Banner ─────────────────────────────────────── */
+.setup-banner {
+  background: color-mix(in srgb, var(--blue) 12%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, var(--blue) 40%, transparent);
+  color: var(--text);
+  padding: 0.6rem 1.2rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.2s;
+}
+.setup-banner:hover {
+  background: color-mix(in srgb, var(--blue) 20%, var(--bg-panel));
+}
+
+/* ── Discovery Panel ──────────────────────────────────── */
+.disc-panel {
+  padding: 1rem 1.5rem;
+}
+.disc-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+.disc-panel-header h3 {
+  margin: 0 0 0.3rem 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.disc-intro {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  margin: 0;
+}
+.disc-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+.disc-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  opacity: 0.75;
+  cursor: pointer;
+}
+.disc-warn {
+  color: var(--yellow, #f0c040);
+  font-size: 0.72rem;
+}
+.disc-run-btn {
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  padding: 0.45rem 1rem;
+  font-size: 0.8rem;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: opacity 0.15s;
+}
+.disc-run-btn:disabled { opacity: 0.5; cursor: default; }
+.disc-spinner {
+  width: 10px; height: 10px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.disc-summary {
+  font-size: 0.75rem;
+  opacity: 0.55;
+  margin-bottom: 1.2rem;
+}
+.disc-error {
+  background: color-mix(in srgb, #e05050 15%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, #e05050 40%, transparent);
+  color: #e05050;
+  padding: 0.6rem 1rem;
+  font-size: 0.8rem;
+  border-radius: 3px;
+  margin-bottom: 1rem;
+}
+.disc-save-notice {
+  background: color-mix(in srgb, var(--green, #50c060) 12%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, var(--green, #50c060) 30%, transparent);
+  padding: 0.6rem 1rem;
+  font-size: 0.8rem;
+  border-radius: 3px;
+  margin-bottom: 1rem;
+}
+.disc-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  opacity: 0.4;
+  font-size: 0.85rem;
+}
+
+.disc-section { margin-bottom: 1.5rem; }
+.disc-section-header {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.5;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
+}
+
+.disc-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.7rem;
+}
+.disc-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: 4px;
+  padding: 0.8rem 1rem;
+}
+.disc-card-dim { opacity: 0.5; }
+.disc-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  flex-wrap: wrap;
+}
+.disc-card-name { font-size: 0.85rem; font-weight: 600; }
+.disc-card-ip { font-size: 0.72rem; opacity: 0.5; margin-left: auto; font-family: monospace; }
+.disc-card-detail { font-size: 0.76rem; opacity: 0.6; margin-bottom: 0.35rem; }
+.disc-card-hint {
+  font-size: 0.73rem;
+  opacity: 0.5;
+  font-style: italic;
+  margin-bottom: 0.35rem;
+  line-height: 1.4;
+}
+
+.disc-badge {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 2px;
+}
+.disc-found       { background: color-mix(in srgb, #50c060 20%, transparent); color: #50c060; }
+.disc-configured  { background: color-mix(in srgb, var(--blue) 20%, transparent); color: var(--blue); }
+.disc-missing     { background: color-mix(in srgb, #888 15%, transparent); color: #888; }
+.disc-partial     { background: color-mix(in srgb, #f0c040 15%, transparent); color: #f0c040; }
+
+.disc-card-save { margin-top: 0.6rem; border-top: 1px solid var(--border, rgba(255,255,255,0.08)); padding-top: 0.6rem; }
+.disc-env-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.disc-env-key {
+  font-family: monospace;
+  font-size: 0.72rem;
+  opacity: 0.7;
+  white-space: nowrap;
+  min-width: 140px;
+}
+.disc-env-val {
+  flex: 1;
+  background: var(--bg, #0e1117);
+  border: 1px solid var(--border, rgba(255,255,255,0.12));
+  color: var(--text);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-family: monospace;
+  border-radius: 2px;
+}
+.disc-save-btn {
+  margin-top: 0.4rem;
+  background: transparent;
+  border: 1px solid var(--blue);
+  color: var(--blue);
+  padding: 0.3rem 0.8rem;
+  font-size: 0.75rem;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.disc-save-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--blue) 15%, transparent); }
+.disc-save-btn:disabled { opacity: 0.4; cursor: default; }
+.disc-saved { font-size: 0.75rem; color: #50c060; margin-top: 0.4rem; }

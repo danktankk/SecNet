@@ -39,6 +39,7 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, 'agent.json')
 INSTALL_PATH = '/usr/local/bin/secnet-agent'
 SERVICE_UNIT = '/etc/systemd/system/secnet-agent.service'
 
+AGENT_VERSION = "0.11.0"
 INTERVAL = 30
 MAX_PROCS = 40
 MAX_EVENTS = 30

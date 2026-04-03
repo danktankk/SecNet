@@ -40,6 +40,7 @@ INSTALL_PATH = '/usr/local/bin/secnet-agent'
 PLIST_PATH = '/Library/LaunchDaemons/com.secnet.agent.plist'
 LOG_FILE = '/var/log/secnet-agent.log'
 
+AGENT_VERSION = "0.11.0"
 INTERVAL = 30
 MAX_PROCS = 40
 MAX_EVENTS = 30

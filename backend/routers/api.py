@@ -237,3 +237,56 @@ async def workstation_report(report: WorkstationReport, x_agent_key: str = Heade
 @router.get("/workstations")
 async def workstations():
     return ws_svc.get_all()
+
+
+# ── Environment Discovery ─────────────────────────────────
+
+from services import environment_scan as env_scan_svc
+from services import env_manager
+import asyncio as _asyncio
+
+_scan_lock = _asyncio.Lock()
+_scan_running = False
+_last_scan: dict | None = None
+
+
+class ConfigUpdateRequest(BaseModel):
+    updates: dict[str, str]
+
+
+@router.post("/discovery/scan")
+async def discovery_scan(include_subnet: bool = True):
+    global _scan_running, _last_scan
+    if _scan_running:
+        return {"status": "running", "message": "Scan already in progress"}
+    _scan_running = True
+    try:
+        result = await env_scan_svc.run_scan(include_subnet=include_subnet)
+        _last_scan = result
+        return {"status": "complete", **result}
+    finally:
+        _scan_running = False
+
+
+@router.get("/discovery/last")
+async def discovery_last():
+    if _last_scan is None:
+        return {"status": "none", "message": "No scan has been run yet"}
+    return {"status": "complete", **_last_scan}
+
+
+@router.post("/config/update", dependencies=[Depends(_require_gate)])
+async def config_update(req: ConfigUpdateRequest):
+    ok, msg = env_manager.update_env(req.updates)
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    return {"status": "ok", "message": msg, "writable": env_manager.env_file_writable()}
+
+
+@router.get("/config/status")
+async def config_status():
+    return {
+        "writable": env_manager.env_file_writable(),
+        "env_path": env_manager.ENV_FILE_PATH,
+        "current": env_manager.read_env(),
+    }

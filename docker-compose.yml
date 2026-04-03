@@ -13,6 +13,11 @@ services:
       - "${PORT:-8088}:8080"
     env_file:
       - .env
+    environment:
+      # Path inside the container where the .env is mounted for read/write.
+      # If you mount .env as a volume (see below), config updates from the UI
+      # and AI chat will persist to disk and survive container restarts.
+      SECNET_ENV_PATH: /app/.env
     logging:
       driver: json-file
       options:
@@ -20,6 +25,12 @@ services:
         max-file: "3"
     volumes:
       - ./data:/data
+      # Mount .env so the AI and discovery UI can update config in place.
+      # Remove this line if you prefer to manage config manually.
+      - ./.env:/app/.env
+      # Optional: mount fail2ban socket for local intrusion prevention data.
+      # Uncomment if fail2ban is running on the Docker host.
+      # - /var/run/fail2ban/fail2ban.sock:/var/run/fail2ban/fail2ban.sock
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health')"]
       interval: 30s

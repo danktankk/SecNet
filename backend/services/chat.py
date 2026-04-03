@@ -210,7 +210,7 @@ async def chat(messages: list[dict], session_unlocked: bool, dashboard_context: 
         max_tokens=2048,
         temperature=0.7,
     )
-    return followup.choices[0].message.content
+    return followup.choices[0].message.content or Done.
 
 
 def check_gate_answer(answer: str) -> bool:

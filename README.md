@@ -172,38 +172,22 @@ python agents\secnet-agent.py start
 **What it collects:** CPU, RAM, disk, top 40 processes, SSH auth events (journalctl or `/var/log/auth.log` fallback), distro info.
 
 ```bash
-# 1. Install dependencies
-pip3 install psutil requests
-
-# 2. Configure
-sudo python3 agents/secnet-agent-linux.py setup --url http://YOUR_SECNET:8088 --key YOUR_AGENT_KEY
-
-# 3. Install as systemd service
-sudo python3 agents/secnet-agent-linux.py install
-
-# 4. Start
-sudo systemctl start secnet-agent
+sudo bash agents/install-linux.sh --url http://YOUR_SECNET:8088 --key YOUR_AGENT_KEY
 ```
 
-**Management commands:**
+That's it. The script installs `psutil` and `requests`, copies the agent to `/usr/local/bin/secnet-agent`, writes the config, creates the systemd unit, enables it, and starts it.
 
-| Command | Description |
-|---------|-------------|
-| `setup --url URL --key KEY` | Create config at `/etc/secnet/agent.json` |
-| `install` | Copy to `/usr/local/bin/secnet-agent`, create systemd unit, enable service |
-| `run` | Run in foreground (for testing) |
-| `status` | Show config and `systemctl` status |
+**After install:**
+```bash
+sudo systemctl status secnet-agent   # check it's running
+journalctl -u secnet-agent -f        # tail logs
+sudo systemctl stop secnet-agent     # stop
+sudo systemctl disable secnet-agent  # remove from autostart
+```
 
 **Config file:** `/etc/secnet/agent.json` (mode 0600)
 **Service unit:** `/etc/systemd/system/secnet-agent.service`
 **Logs:** `journalctl -u secnet-agent -f`
-
-**After install:**
-```bash
-sudo systemctl start secnet-agent    # start now
-sudo systemctl status secnet-agent   # check it's running
-journalctl -u secnet-agent -f        # tail logs
-```
 
 ---
 
@@ -212,38 +196,21 @@ journalctl -u secnet-agent -f        # tail logs
 **What it collects:** CPU, RAM, disk, top 40 processes, Unified Log security events (securityd, sshd, authentication), macOS version.
 
 ```bash
-# 1. Install dependencies
-pip3 install psutil requests
-
-# 2. Configure
-sudo python3 agents/secnet-agent-mac.py setup --url http://YOUR_SECNET:8088 --key YOUR_AGENT_KEY
-
-# 3. Install as launchd service
-sudo python3 agents/secnet-agent-mac.py install
-
-# 4. Load the service
-sudo launchctl load /Library/LaunchDaemons/com.secnet.agent.plist
+sudo bash agents/install-mac.sh --url http://YOUR_SECNET:8088 --key YOUR_AGENT_KEY
 ```
 
-**Management commands:**
+That's it. The script installs `psutil` and `requests`, copies the agent to `/usr/local/bin/secnet-agent`, writes the config, creates the launchd plist, and loads it.
 
-| Command | Description |
-|---------|-------------|
-| `setup --url URL --key KEY` | Create config at `/etc/secnet/agent.json` |
-| `install` | Copy to `/usr/local/bin/secnet-agent`, create launchd plist |
-| `run` | Run in foreground (for testing) |
-| `status` | Show config and launchd status |
+**After install:**
+```bash
+tail -f /var/log/secnet-agent.log                                      # logs
+sudo launchctl unload /Library/LaunchDaemons/com.secnet.agent.plist   # stop
+sudo launchctl load /Library/LaunchDaemons/com.secnet.agent.plist     # start
+```
 
 **Config file:** `/etc/secnet/agent.json` (mode 0600)
 **Plist:** `/Library/LaunchDaemons/com.secnet.agent.plist`
 **Log file:** `/var/log/secnet-agent.log`
-
-**After install:**
-```bash
-sudo launchctl load /Library/LaunchDaemons/com.secnet.agent.plist     # start
-sudo launchctl unload /Library/LaunchDaemons/com.secnet.agent.plist   # stop
-tail -f /var/log/secnet-agent.log                                      # logs
-```
 
 ---
 

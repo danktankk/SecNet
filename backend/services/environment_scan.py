@@ -99,15 +99,6 @@ def _get_default_gateway() -> str | None:
 
 def _get_local_subnet() -> str | None:
     try:
-        import netifaces  # type: ignore
-        for iface in netifaces.interfaces():
-            for a in netifaces.ifaddresses(iface).get(netifaces.AF_INET, []):
-                ip, mask = a.get("addr", ""), a.get("netmask", "")
-                if ip and not ip.startswith("127.") and mask:
-                    return str(ipaddress.IPv4Network(f"{ip}/{mask}", strict=False))
-    except ImportError:
-        pass
-    try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
@@ -225,7 +216,6 @@ async def _probe_aruba(ip: str, port: int) -> DiscoveryResult | None:
 
 
 # Probe table: (port, coroutine_function). Built once at module load.
-GatewayProbe = tuple[int, Callable[..., asyncio.coroutines._CoroutineType]]  # type: ignore[type-arg]
 GATEWAY_PROBES: list[tuple[int, Callable]] = [
     (49000, _probe_fritzbox),
     (49443, lambda ip, port: _probe_fritzbox(ip, port, tls=True)),
@@ -256,7 +246,7 @@ def _audit_config() -> list[DiscoveryResult]:
     ))
 
     for name, enabled, values, keys, desc in CONFIG_CHECKS:
-        configured = bool(values) and all(bool(v) for v in values)
+        configured = all(values)
         if not enabled:
             status: Status = "not_found"
             detail = f"Disabled in config (ENABLE_{name.upper()}=false)"
@@ -289,8 +279,14 @@ async def _sweep_subnet(subnet: str) -> list[DiscoveryResult]:
     except ValueError:
         return []
 
+    sem = asyncio.Semaphore(200)
+
+    async def bounded_tcp_open(ip_str: str, port: int) -> bool:
+        async with sem:
+            return await _tcp_open(ip_str, port)
+
     tasks = [
-        _tcp_open(str(h), port)
+        bounded_tcp_open(str(h), port)
         for h in hosts
         for port in PORT_SERVICE_MAP
     ]
@@ -315,7 +311,7 @@ async def _sweep_subnet(subnet: str) -> list[DiscoveryResult]:
                 seen.add(key)
                 url = svc["url_template"].format(ip=ip_str)
                 status, _ = await _http_get(url.rstrip("/") + svc["path"], timeout=CONFIRM_TIMEOUT)
-                if status > 0:
+                if status in (200, 201, 204):
                     suggested = {k: url for k in svc["env_keys"] if "URL" in k}
                     results.append(DiscoveryResult(
                         name=svc["name"], status="found", ip=ip_str, port=port,

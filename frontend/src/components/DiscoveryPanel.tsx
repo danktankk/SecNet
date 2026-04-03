@@ -51,6 +51,10 @@ function buildScanSummary(results: ScanResponse): string {
   return parts.join(' · ')
 }
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 async function postConfigUpdate(
   updates: Record<string, string>,
   gateToken: string,
@@ -122,7 +126,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, gateToken, onSaved }) =
       setSaveState({ saving: false, saved: true, error: null })
       onSaved(data.message)
     } catch (err) {
-      setSaveState({ saving: false, saved: false, error: String(err instanceof Error ? err.message : err) })
+      setSaveState({ saving: false, saved: false, error: errorMessage(err) })
     }
   }
 
@@ -161,6 +165,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, gateToken, onSaved }) =
               <span className="disc-env-key">{k}</span>
               <input
                 className="disc-env-val"
+                value={editValues[k] ?? ''}
                 onChange={e => handleValueChange(k, e.target.value)}
                 placeholder="enter value…"
               />
@@ -207,7 +212,7 @@ export default function DiscoveryPanel({ gateToken }: DiscoveryPanelProps): Reac
       const data = await postScan(includeSubnet)
       setResults(data)
     } catch (err) {
-      setError(String(err instanceof Error ? err.message : err))
+      setError(errorMessage(err))
     } finally {
       setScanning(false)
     }

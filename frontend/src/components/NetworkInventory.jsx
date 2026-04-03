@@ -3,7 +3,7 @@ import { useApi } from '../hooks/useApi'
 import GateUnlock from './GateUnlock'
 import GateSessionBar from './GateSessionBar'
 import { fmtMem } from '../utils/format'
-import { gateIsValid, TOKEN_KEY } from '../utils/gate'
+import { gateIsValid, TOKEN_KEY, NET_GATE_KEY } from '../utils/gate'
 
 const severityColor = (sev) => sev === 'safe' ? 'var(--green)' : sev === 'danger' ? 'var(--red)' : 'var(--amber)'
 
@@ -399,7 +399,7 @@ export default function NetworkInventory() {
   const { data, loading } = useApi('/api/network/inventory', 60000)
   const { data: hostsData, loading: hostsLoading } = useApi('/api/network/hosts', 30000)
   const [scanningAll, setScanningAll] = useState(false)
-  const [unlocked, setUnlocked] = useState(() => gateIsValid('security_gate_net'))
+  const [unlocked, setUnlocked] = useState(() => gateIsValid(NET_GATE_KEY))
 
   const scanAll = async () => {
     setScanningAll(true)
@@ -429,10 +429,10 @@ export default function NetworkInventory() {
     <div className="network-inventory gate-locked-wrapper">
       {!unlocked && (
         <div className="gate-locked-overlay">
-          <GateUnlock storageKey="security_gate_net" label="Enter credentials to reveal host details:" onUnlock={() => setUnlocked(true)} />
+          <GateUnlock storageKey={NET_GATE_KEY} label="Enter credentials to reveal host details:" onUnlock={() => setUnlocked(true)} />
         </div>
       )}
-      {unlocked && <GateSessionBar gateKey="security_gate_net" onLock={() => setUnlocked(false)} />}
+      {unlocked && <GateSessionBar gateKey={NET_GATE_KEY} onLock={() => setUnlocked(false)} />}
 
       <div className={unlocked ? '' : 'gate-content-blur'}>
       <div className="net-header" style={{ marginTop: 0, alignItems: 'baseline' }}>

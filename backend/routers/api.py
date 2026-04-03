@@ -1,3 +1,4 @@
+import asyncio
 from collections import defaultdict
 import time
 
@@ -246,7 +247,7 @@ async def workstations():
 
 # ── Environment Discovery ─────────────────────────────────
 
-_scan_running = False
+_scan_lock = asyncio.Lock()
 _last_scan: dict | None = None
 
 
@@ -256,16 +257,13 @@ class ConfigUpdateRequest(BaseModel):
 
 @router.post("/discovery/scan", dependencies=[Depends(_require_gate)])
 async def discovery_scan(include_subnet: bool = True):
-    global _scan_running, _last_scan
-    if _scan_running:
+    global _last_scan
+    if _scan_lock.locked():
         raise HTTPException(status_code=409, detail="Scan already in progress")
-    _scan_running = True
-    try:
+    async with _scan_lock:
         result = await env_scan_svc.run_scan(include_subnet=include_subnet)
         _last_scan = result
         return {"status": "complete", **result}
-    finally:
-        _scan_running = False
 
 
 @router.get("/discovery/last", dependencies=[Depends(_require_gate)])

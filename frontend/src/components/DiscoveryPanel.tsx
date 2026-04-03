@@ -71,8 +71,11 @@ async function postConfigUpdate(
   return res.json() as Promise<ConfigUpdateResponse>
 }
 
-async function postScan(includeSubnet: boolean): Promise<ScanResponse> {
-  const res = await fetch(`/api/discovery/scan?include_subnet=${includeSubnet}`, { method: 'POST' })
+async function postScan(includeSubnet: boolean, gateToken: string): Promise<ScanResponse> {
+  const res = await fetch(`/api/discovery/scan?include_subnet=${includeSubnet}`, {
+    method: 'POST',
+    headers: { 'X-Gate-Token': gateToken },
+  })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Scan failed' }))
     throw new Error((err as { detail?: string }).detail ?? 'Scan failed')
@@ -190,7 +193,7 @@ const Section: React.FC<SectionProps> = ({ title, icon, results, gateToken, onSa
       <div className="disc-section-header">{icon} {title}</div>
       <div className="disc-cards">
         {results.map(r => (
-          <ResultCard key={r.name} result={r} gateToken={gateToken} onSaved={onSaved} />
+          <ResultCard key={`${r.name}-${r.ip}-${r.port}`} result={r} gateToken={gateToken} onSaved={onSaved} />
         ))}
       </div>
     </div>
@@ -209,7 +212,7 @@ export default function DiscoveryPanel({ gateToken }: DiscoveryPanelProps): Reac
     setError(null)
     setSaveNotice(null)
     try {
-      const data = await postScan(includeSubnet)
+      const data = await postScan(includeSubnet, gateToken)
       setResults(data)
     } catch (err) {
       setError(errorMessage(err))

@@ -135,7 +135,7 @@ async def _probe_fritzbox(ip: str, port: int, *, tls: bool = False) -> Discovery
     scheme = "https" if tls else "http"
     status, body = await _http_get(f"{scheme}://{ip}:{port}/")
     body_lower = body.lower()
-    if status > 0 and ("fritz" in body_lower or "avm" in body_lower or "TR-064" in body):
+    if status in (200, 201, 204, 400, 401, 403, 422) and ("fritz" in body_lower or "avm" in body_lower or "TR-064" in body):
         label = "FritzBox (TLS)" if tls else "FritzBox"
         return DiscoveryResult(
             name=label, status="found", ip=ip, port=port,
@@ -164,7 +164,7 @@ async def _probe_unifi(ip: str, port: int) -> DiscoveryResult | None:
 
 async def _probe_pfsense(ip: str, port: int) -> DiscoveryResult | None:
     status, body = await _http_get(f"https://{ip}:{port}/")
-    if status > 0 and ("pfsense" in body.lower() or "pfSense" in body):
+    if status in (200, 201, 204, 400, 401, 403, 422) and ("pfsense" in body.lower() or "pfSense" in body):
         return DiscoveryResult(
             name="pfSense", status="found", ip=ip, port=port,
             detail="pfSense firewall detected",

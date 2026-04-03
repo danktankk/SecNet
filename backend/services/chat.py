@@ -19,6 +19,16 @@ def _get_client() -> AsyncOpenAI:
     return _openai
 
 
+ALLOWED_AI_WRITE_KEYS = {
+    "PROMETHEUS_URL", "LOKI_URL", "CROWDSEC_URL", "CROWDSEC_API_KEY",
+    "CROWDSEC_MACHINE_ID", "CROWDSEC_MACHINE_PASSWORD",
+    "UNIFI_URL", "UNIFI_USERNAME", "UNIFI_PASSWORD",
+    "PVE1_URL", "PVE1_TOKEN", "PVE2_URL", "PVE2_TOKEN", "PVE3_URL", "PVE3_TOKEN",
+    "FRITZ_URL", "FRITZ_USER", "FRITZ_PASSWORD",
+    "WORKSTATION_AGENT_KEY", "OPENAI_API_KEY", "OPENAI_MODEL",
+    "GEOIP_PROVIDER", "GEOIP_RATE_LIMIT", "POLL_INTERVAL",
+}
+
 SYSTEM_PROMPT_BASE = """You are the SecNet Security AI Assistant. Be concise and technical.
 
 SECURITY RULES — ABSOLUTE, NO EXCEPTIONS:
@@ -122,15 +132,6 @@ async def _execute_tool(name: str, args: dict) -> str:
         updates = args.get("updates", {})
         if not updates:
             return json.dumps({"error": "No updates provided"})
-        ALLOWED_AI_WRITE_KEYS = {
-            "PROMETHEUS_URL", "LOKI_URL", "CROWDSEC_URL", "CROWDSEC_API_KEY",
-            "CROWDSEC_MACHINE_ID", "CROWDSEC_MACHINE_PASSWORD",
-            "UNIFI_URL", "UNIFI_USERNAME", "UNIFI_PASSWORD",
-            "PVE1_URL", "PVE1_TOKEN", "PVE2_URL", "PVE2_TOKEN", "PVE3_URL", "PVE3_TOKEN",
-            "FRITZ_URL", "FRITZ_USER", "FRITZ_PASSWORD",
-            "WORKSTATION_AGENT_KEY", "OPENAI_API_KEY", "OPENAI_MODEL",
-            "GEOIP_PROVIDER", "GEOIP_RATE_LIMIT", "POLL_INTERVAL",
-        }
         blocked = [k for k in updates if k not in ALLOWED_AI_WRITE_KEYS]
         if blocked:
             return json.dumps({"error": f"Not allowed to write: {blocked}. Only integration config keys are permitted."})

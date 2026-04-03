@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """SecNet Windows Agent"""
-import json, os, platform, shutil, socket, subprocess, sys, time, logging, ctypes
+import json, os, platform, shutil, socket, subprocess, sys, time, logging, ctypes, threading
 import psutil, requests
 
 PROGRAM_DIR = os.path.join(os.environ.get('PROGRAMFILES', 'C:\\Program Files'), 'SecNet')
@@ -11,11 +11,14 @@ INSTALL_EXE = os.path.join(PROGRAM_DIR, 'secnet-agent.exe')
 SERVICE_NAME = 'SecNetAgent'
 SERVICE_DISPLAY = 'SecNet Monitoring Agent'
 SERVICE_DESC = 'Reports workstation health and security events to SecNet dashboard'
-AGENT_VERSION = "0.11.0"
+AGENT_VERSION = "0.11.1"
 INTERVAL = 30
 MAX_PROCS = 40
 MAX_EVENTS = 30
 SECURITY_EVENT_IDS = {4624, 4625, 4648, 4688, 4703, 4704, 4776, 4800, 4801, 5156, 7045}
+
+# Logical CPU count for normalizing per-process cpu_percent
+_cpu_count = psutil.cpu_count(logical=True) or 1
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 log = logging.getLogger('secnet-agent')
@@ -74,7 +77,8 @@ def get_processes():
     for p in psutil.process_iter(['name', 'pid', 'cpu_percent', 'memory_info']):
         try:
             i = p.info
-            procs.append({'name': i['name'] or '', 'pid': i['pid'], 'cpu': round(i['cpu_percent'] or 0, 1),
+            procs.append({'name': i['name'] or '', 'pid': i['pid'],
+                          'cpu': round((i['cpu_percent'] or 0) / _cpu_count, 1),
                           'ram': int((i['memory_info'].rss if i['memory_info'] else 0) / 1048576)})
         except: continue
     procs.sort(key=lambda x: x['cpu'], reverse=True)
@@ -110,7 +114,7 @@ def collect():
     return {
         'hostname': socket.gethostname(), 'ip': ip, 'mac': mac, 'os': get_os_version(),
         'domain': get_domain(), 'user': user, 'session_start': ss,
-        'cpu': int(psutil.cpu_percent(interval=1)), 'ram': int(psutil.virtual_memory().percent),
+        'cpu': int(psutil.cpu_percent(interval=None)), 'ram': int(psutil.virtual_memory().percent),
         'disk': int(psutil.disk_usage('C:\\').percent),
         'processes': get_processes(), 'events': get_events(),
     }
@@ -121,14 +125,25 @@ def report(url, key, payload):
 
 def agent_loop(url, key, stop_event=None):
     log.info(f'Reporting to {url} every {INTERVAL}s')
+    # Prime CPU measurement counters — first non-blocking call always returns 0.0
+    psutil.cpu_percent(interval=None)
+    for p in psutil.process_iter():
+        try: p.cpu_percent(interval=None)
+        except: pass
+    # First wait establishes the measurement window for cpu_percent(interval=None)
+    if stop_event:
+        stop_event.wait(INTERVAL)
+    else:
+        time.sleep(INTERVAL)
     while not (stop_event and stop_event.is_set()):
         try:
             resp = report(url, key, collect())
             log.info(f'Reported {socket.gethostname()} — {resp.get("status","?")}')
         except Exception as e: log.error(f'Report failed: {e}')
-        for _ in range(INTERVAL):
-            if stop_event and stop_event.is_set(): break
-            time.sleep(1)
+        if stop_event:
+            stop_event.wait(INTERVAL)
+        else:
+            time.sleep(INTERVAL)
 
 # ── Windows Service ───────────────────────────────────────
 try:
@@ -144,7 +159,6 @@ try:
             self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
             win32event.SetEvent(self.stop_event)
         def SvcDoRun(self):
-            import threading
             os.makedirs(CONFIG_DIR, exist_ok=True)
             fh = logging.FileHandler(LOG_FILE)
             fh.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))

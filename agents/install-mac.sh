@@ -53,6 +53,7 @@ if [[ ! -f "$AGENT_PY" ]]; then
     -o /tmp/secnet-agent-mac.py || { echo "ERROR: download failed"; exit 1; }
   AGENT_PY="/tmp/secnet-agent-mac.py"
 fi
+mkdir -p /usr/local/bin
 cp "$AGENT_PY" /usr/local/bin/secnet-agent
 chmod +x /usr/local/bin/secnet-agent
 echo "  Agent installed to /usr/local/bin/secnet-agent"

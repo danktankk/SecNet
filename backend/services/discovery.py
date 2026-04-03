@@ -1,4 +1,4 @@
-"""Auto-discovery — populate hosts table from Proxmox + UniFi on startup.
+"""Auto-discovery — populate hosts table from Proxmox on startup.
 
 Runs once at startup. Skips hosts already in the DB (matched by IP).
 Adds new discoveries. Never deletes or overwrites existing entries.
@@ -138,44 +138,6 @@ def _discover_proxmox() -> list[dict]:
     return hosts
 
 
-def _discover_unifi() -> list[dict]:
-    """Pull network devices (APs, switches, gateway) from UniFi."""
-    if not settings.unifi_url or not settings.unifi_username or not settings.enable_unifi:
-        return []
-    hosts = []
-    try:
-        c = httpx.Client(verify=False, timeout=15)
-        r = c.post(f"{settings.unifi_url}/api/auth/login", json={
-            "username": settings.unifi_username,
-            "password": settings.unifi_password,
-        })
-        r.raise_for_status()
-        cookies = dict(r.cookies)
-
-        # Get devices
-        r = c.get(f"{settings.unifi_url}/proxy/network/api/s/default/stat/device", cookies=cookies)
-        r.raise_for_status()
-        devices = r.json().get("data", [])
-
-        type_labels = {"ugw": "Gateway", "udm": "Gateway", "usw": "Switch", "uap": "Access Point"}
-        for dev in devices:
-            dtype = dev.get("type", "")
-            ip = dev.get("ip", "")
-            name = dev.get("name", dev.get("hostname", dev.get("model", "Unknown")))
-            if not ip:
-                continue
-            label = type_labels.get(dtype, "Network Device")
-            hosts.append({
-                "name": name, "ip": ip, "group": "Network",
-                "role": label,
-                "check_port": 22, "services": [label],
-            })
-        c.close()
-    except Exception as e:
-        logger.warning(f"UniFi discovery failed: {e}")
-    return hosts
-
-
 def run_discovery():
     """Main entry point — called once at startup."""
     existing = _existing_ips()
@@ -187,15 +149,6 @@ def run_discovery():
             if host["ip"] not in existing:
                 _insert_host(**host)
                 _insert_known_ip(host["name"], host["ip"])
-                existing.add(host["ip"])
-                added += 1
-                logger.info(f"Discovered: {host['name']} ({host['ip']}) [{host['group']}]")
-
-    # UniFi
-    if settings.enable_unifi:
-        for host in _discover_unifi():
-            if host["ip"] not in existing:
-                _insert_host(**host)
                 existing.add(host["ip"])
                 added += 1
                 logger.info(f"Discovered: {host['name']} ({host['ip']}) [{host['group']}]")

@@ -67,7 +67,11 @@ def update_env(updates: dict[str, str]) -> tuple[bool, str]:
         )
 
     try:
-        lines = open(ENV_FILE_PATH, "r").readlines() if os.path.exists(ENV_FILE_PATH) else []
+        if os.path.exists(ENV_FILE_PATH):
+            with open(ENV_FILE_PATH, "r") as f:
+                lines = f.readlines()
+        else:
+            lines = []
         pending = dict(updates)
         new_lines = []
 

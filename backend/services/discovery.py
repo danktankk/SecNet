@@ -4,6 +4,7 @@ Runs once at startup. Skips hosts already in the DB (matched by IP).
 Adds new discoveries. Never deletes or overwrites existing entries.
 """
 from __future__ import annotations
+import re
 import json
 import logging
 import sqlite3
@@ -99,7 +100,6 @@ def _discover_proxmox() -> list[dict]:
                                     cfg = cr.json().get("data", {})
                                     for key in sorted(cfg.keys()):
                                         if key.startswith("net"):
-                                            import re
                                             m = re.search(r"ip=(\d+\.\d+\.\d+\.\d+)", cfg[key])
                                             if m:
                                                 ip = m.group(1)

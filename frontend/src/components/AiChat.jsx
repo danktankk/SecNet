@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { gateIsValid, gateSet, TOKEN_KEY } from '../utils/gate'
+import { gateIsValid, gateSet, TOKEN_KEY, CHAT_GATE_KEY } from '../utils/gate'
 
-const GATE_KEY = 'security_gate_chat'
 
 const EXAMPLE_GROUPS = [
   {
@@ -29,7 +28,7 @@ export default function AiChat() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [unlocked, setUnlocked] = useState(() => gateIsValid(GATE_KEY))
+  const [unlocked, setUnlocked] = useState(() => gateIsValid(CHAT_GATE_KEY))
   const [showGatePrompt, setShowGatePrompt] = useState(false)
   const [gateInput, setGateInput] = useState('')
   const [gateError, setGateError] = useState('')
@@ -57,7 +56,7 @@ export default function AiChat() {
       }
       const d = await r.json()
       if (d.unlocked) {
-        gateSet(GATE_KEY, gateInput)
+        gateSet(CHAT_GATE_KEY, gateInput)
         setUnlocked(true)
         setShowGatePrompt(false)
         setGateInput('')

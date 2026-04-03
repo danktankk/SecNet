@@ -26,12 +26,14 @@ pip3 install --quiet --break-system-packages psutil requests 2>/dev/null || \
   pip install --quiet --break-system-packages psutil requests
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [[ -f "$SCRIPT_DIR/secnet-agent-mac.py" ]]; then
-  cp "$SCRIPT_DIR/secnet-agent-mac.py" /usr/local/bin/secnet-agent
-else
-  echo "ERROR: secnet-agent-mac.py not found in $SCRIPT_DIR"
-  exit 1
+AGENT_PY="$SCRIPT_DIR/secnet-agent-mac.py"
+if [[ ! -f "$AGENT_PY" ]]; then
+  echo "Downloading agent from GitHub..."
+  curl -fsSL "https://raw.githubusercontent.com/danktankk/SecNet/main/agents/secnet-agent-mac.py" \
+    -o /tmp/secnet-agent-mac.py || { echo "ERROR: download failed"; exit 1; }
+  AGENT_PY="/tmp/secnet-agent-mac.py"
 fi
+cp "$AGENT_PY" /usr/local/bin/secnet-agent
 chmod +x /usr/local/bin/secnet-agent
 
 mkdir -p /etc/secnet

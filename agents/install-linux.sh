@@ -35,12 +35,14 @@ fi
 # Download agent
 AGENT_URL="${URL%/}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [[ -f "$SCRIPT_DIR/secnet-agent-linux.py" ]]; then
-  cp "$SCRIPT_DIR/secnet-agent-linux.py" /usr/local/bin/secnet-agent
-else
-  echo "ERROR: secnet-agent-linux.py not found in $SCRIPT_DIR"
-  exit 1
+AGENT_PY="$SCRIPT_DIR/secnet-agent-linux.py"
+if [[ ! -f "$AGENT_PY" ]]; then
+  echo "Downloading agent from GitHub..."
+  curl -fsSL "https://raw.githubusercontent.com/danktankk/SecNet/main/agents/secnet-agent-linux.py" \
+    -o /tmp/secnet-agent-linux.py || { echo "ERROR: download failed"; exit 1; }
+  AGENT_PY="/tmp/secnet-agent-linux.py"
 fi
+cp "$AGENT_PY" /usr/local/bin/secnet-agent
 chmod +x /usr/local/bin/secnet-agent
 
 # Save config

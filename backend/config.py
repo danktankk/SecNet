@@ -19,7 +19,6 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
 
     # Optional with safe non-sensitive defaults
-    geoip_provider: str = "ip-api"
     geoip_rate_limit: int = 45
     poll_interval: int = 15
     openai_model: str = "gpt-4.1-mini"

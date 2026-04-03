@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from typing import Any
 
 _DB_PATH = os.environ.get("SECNET_DB", "/data/secnet.db")
 
@@ -81,7 +80,7 @@ def connect() -> sqlite3.Connection:
     return conn
 
 
-def get_host_registry() -> list[dict[str, Any]]:
+def get_host_registry() -> list[dict]:
     conn = connect()
     try:
         rows = conn.execute(
@@ -89,7 +88,7 @@ def get_host_registry() -> list[dict[str, Any]]:
         ).fetchall()
         result = []
         for r in rows:
-            entry: dict[str, Any] = {
+            entry: dict = {
                 "name": r["name"],
                 "ip": r["ip"],
                 "group": r["group_name"],

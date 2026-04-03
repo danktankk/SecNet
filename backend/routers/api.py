@@ -2,6 +2,7 @@ import asyncio
 from collections import defaultdict
 import time
 
+from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel
 from services import aggregator
@@ -9,7 +10,7 @@ from services import network
 from services import hosts as hosts_svc
 from services import unifi
 from services import chat as chat_svc
-from services.data_layer import get_alerts
+from services import gate as gate_svc
 from services import workstations as ws_svc
 from services import environment_scan as env_scan_svc
 from services import env_manager
@@ -37,7 +38,7 @@ router = APIRouter(prefix="/api")
 
 
 async def _require_gate(x_gate_token: str = Header(default="")):
-    if not chat_svc.check_gate_answer(x_gate_token):
+    if not gate_svc.check_gate_answer(x_gate_token):
         raise HTTPException(status_code=403, detail="Gate locked")
 
 
@@ -72,10 +73,6 @@ async def summary():
 async def decisions():
     return await aggregator.get_decisions_with_geo()
 
-
-@router.get("/alerts")
-async def alerts(since: str = Query("1h")):
-    return await get_alerts(since=since)
 
 
 @router.get("/timeline")
@@ -115,7 +112,7 @@ async def chat_endpoint(req: ChatRequest, x_gate_token: str = Header(default="")
     # Check gate server-side instead of trusting client
     session_unlocked = False
     if x_gate_token:
-        session_unlocked = chat_svc.check_gate_answer(x_gate_token)
+        session_unlocked = gate_svc.check_gate_answer(x_gate_token)
 
     try:
         s = await aggregator.get_summary()
@@ -138,7 +135,7 @@ class GateCheckRequest(BaseModel):
 @router.post("/chat/gate-check")
 async def gate_check(req: GateCheckRequest, request: Request):
     _check_rate_limit(request.client.host)
-    return {"unlocked": chat_svc.check_gate_answer(req.answer)}
+    return {"unlocked": gate_svc.check_gate_answer(req.answer)}
 
 
 # ── Infrastructure (Proxmox) ──────────────────────────────
@@ -167,7 +164,7 @@ async def network_scan_all():
     inventory = await network.get_full_inventory()
     ips = set()
     for node in inventory:
-        host = node.get("url", "").replace("https://", "").replace(":8006", "")
+        host = urlparse(node.get("url", "")).hostname or ""
         if host:
             ips.add(host)
     results = await asyncio.gather(*[network.scan_host(ip, force=True) for ip in ips])
@@ -233,6 +230,8 @@ class WorkstationReport(BaseModel):
 
 @router.post("/workstations/report")
 async def workstation_report(report: WorkstationReport, x_agent_key: str = Header(default="")):
+    if not settings.enable_workstations:
+        raise HTTPException(status_code=503, detail="Workstations disabled")
     if not settings.workstation_agent_key or x_agent_key != settings.workstation_agent_key:
         raise HTTPException(status_code=403, detail="Invalid agent key")
     ws_svc.upsert_workstation(report.model_dump())
@@ -241,6 +240,8 @@ async def workstation_report(report: WorkstationReport, x_agent_key: str = Heade
 
 @router.get("/workstations")
 async def workstations():
+    if not settings.enable_workstations:
+        raise HTTPException(status_code=503, detail="Workstations disabled")
     return ws_svc.get_all()
 
 

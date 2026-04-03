@@ -99,10 +99,9 @@ def _get_default_gateway() -> str | None:
 
 def _get_local_subnet() -> str | None:
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
         if not ip.startswith("127."):
             return str(ipaddress.IPv4Network(f"{ip}/24", strict=False))
     except Exception:
@@ -267,7 +266,9 @@ async def _scan_gateway(gateway_ip: str) -> list[DiscoveryResult]:
     seen: set[str] = set()
     results: list[DiscoveryResult] = []
     for h in hits:
-        if isinstance(h, DiscoveryResult) and h.name not in seen:
+        if isinstance(h, Exception):
+            logger.debug("Gateway probe exception: %s", h)
+        elif isinstance(h, DiscoveryResult) and h.name not in seen:
             results.append(h)
             seen.add(h.name)
     return results

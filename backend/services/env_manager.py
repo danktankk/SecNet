@@ -54,6 +54,12 @@ def update_env(updates: dict[str, str]) -> tuple[bool, str]:
     if not updates:
         return True, "No changes requested"
 
+    for key, val in updates.items():
+        if not re.match(r'^[A-Z0-9_]+$', key):
+            return False, f"Invalid key name '{key}' — only uppercase letters, digits, and underscores allowed"
+    # Strip newlines and null bytes from all values
+    updates = {k: v.replace('\n', '').replace('\r', '').replace('\0', '') for k, v in updates.items()}
+
     if not env_file_writable():
         return False, (
             f"Cannot write to {ENV_FILE_PATH}. "
@@ -61,12 +67,7 @@ def update_env(updates: dict[str, str]) -> tuple[bool, str]:
         )
 
     try:
-        try:
-            with open(ENV_FILE_PATH, "r") as f:
-                lines = f.readlines()
-        except FileNotFoundError:
-            lines = []
-
+        lines = open(ENV_FILE_PATH, "r").readlines() if os.path.exists(ENV_FILE_PATH) else []
         pending = dict(updates)
         new_lines = []
 

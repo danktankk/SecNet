@@ -10,6 +10,8 @@ from services import unifi
 from services import chat as chat_svc
 from services.data_layer import get_alerts
 from services import workstations as ws_svc
+from services import environment_scan as env_scan_svc
+from services import env_manager
 from config import settings
 
 # ── Manual rate limiter for gate-check ───────────────────
@@ -20,9 +22,12 @@ GATE_RATE_WINDOW = 60  # per 60 seconds
 
 def _check_rate_limit(client_ip: str):
     now = time.time()
-    attempts = _gate_attempts[client_ip]
-    # Prune old attempts
-    _gate_attempts[client_ip] = [t for t in attempts if now - t < GATE_RATE_WINDOW]
+    if len(_gate_attempts) > 500:
+        for ip in list(_gate_attempts.keys()):
+            _gate_attempts[ip] = [t for t in _gate_attempts[ip] if now - t < GATE_RATE_WINDOW]
+            if not _gate_attempts[ip]:
+                del _gate_attempts[ip]
+    _gate_attempts[client_ip] = [t for t in _gate_attempts[client_ip] if now - t < GATE_RATE_WINDOW]
     if len(_gate_attempts[client_ip]) >= GATE_RATE_LIMIT:
         raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
     _gate_attempts[client_ip].append(now)
@@ -241,9 +246,6 @@ async def workstations():
 
 # ── Environment Discovery ─────────────────────────────────
 
-from services import environment_scan as env_scan_svc
-from services import env_manager
-
 _scan_running = False
 _last_scan: dict | None = None
 
@@ -252,11 +254,11 @@ class ConfigUpdateRequest(BaseModel):
     updates: dict[str, str]
 
 
-@router.post("/discovery/scan")
+@router.post("/discovery/scan", dependencies=[Depends(_require_gate)])
 async def discovery_scan(include_subnet: bool = True):
     global _scan_running, _last_scan
     if _scan_running:
-        return {"status": "running", "message": "Scan already in progress"}
+        raise HTTPException(status_code=409, detail="Scan already in progress")
     _scan_running = True
     try:
         result = await env_scan_svc.run_scan(include_subnet=include_subnet)
@@ -266,7 +268,7 @@ async def discovery_scan(include_subnet: bool = True):
         _scan_running = False
 
 
-@router.get("/discovery/last")
+@router.get("/discovery/last", dependencies=[Depends(_require_gate)])
 async def discovery_last():
     if _last_scan is None:
         return {"status": "none", "message": "No scan has been run yet"}

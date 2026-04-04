@@ -997,7 +997,7 @@ body {
 .gate-locked-overlay {
   position: absolute; inset: 0; z-index: 10;
   display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
+  align-items: center; justify-content: flex-start; padding-top: 80px;
   background:
     repeating-linear-gradient(
       0deg,

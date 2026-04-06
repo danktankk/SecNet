@@ -5,10 +5,9 @@
   <img src="https://img.shields.io/badge/agents-win_linux_mac-8A2BE2" />
 </p>
 
-<p align="left">
-  <b>SecNet</b>
-  &nbsp;&nbsp;
-  <img src="images/secnet.png" alt="SecNet" width="100">
+<p align="center">
+  <img src="images/secnet.png" alt="SecNet" width="120" /><br>
+  <h1>SecNet</h1>
 </p>
 
 > Not 100% production ready, but close.  While it is mostly read only, you should always review the code and be mindful of upstream dependencies.

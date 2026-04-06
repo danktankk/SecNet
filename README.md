@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/agents-win_linux_mac-8A2BE2" />
 </p>
 
-<table align="left">
+<table>
   <tr>
     <td>
       <img src="images/secnet.png" height="100">
@@ -15,6 +15,8 @@
     </td>
   </tr>
 </table>
+
+<br clear="all">
 
 > Not 100% production ready, but close.  While it is mostly read only, you should always review the code and be mindful of upstream dependencies.
 

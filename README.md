@@ -5,16 +5,13 @@
   <img src="https://img.shields.io/badge/agents-win_linux_mac-8A2BE2" />
 </p>
 
-<table align="center">
+<table align="left">
   <tr>
     <td>
       <img src="images/secnet.png" height="100">
     </td>
     <td>
-      &nbsp;&nbsp;|&nbsp;&nbsp;
-    </td>
-    <td>
-      <b>SecNet</b>
+      <h2>SecNet</h2>
     </td>
   </tr>
 </table>

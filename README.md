@@ -3,7 +3,7 @@
   <img src="https://img.shields.io/badge/docker-compose-orange" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" />
   <img src="https://img.shields.io/badge/agents-win_linux_mac-8A2BE2" />
-</p>
+
 
 <table align="left">
   <tr>
@@ -15,6 +15,7 @@
     </td>
   </tr>
 </table>
+</p>
 
 > Not 100% production ready, but close.  While it is mostly read only, you should always review the code and be mindful of upstream dependencies.
 

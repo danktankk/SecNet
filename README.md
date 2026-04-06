@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/agents-win_linux_mac-8A2BE2" />
 </p>
 
-<p align="center">
+<p align="left">
   <b>SecNet</b>
   &nbsp;&nbsp;
   <img src="images/secnet.png" alt="SecNet" width="100">

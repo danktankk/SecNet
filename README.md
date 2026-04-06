@@ -8,7 +8,7 @@
 <table>
   <tr>
     <td>
-      <img src="images/secnet.png" height="100">
+      <img src="images/secnet.png" height="120">
     </td>
     <td>
       <h1>SecNet</h1>

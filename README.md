@@ -3,8 +3,9 @@
   <img src="https://img.shields.io/badge/docker-compose-orange" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" />
   <img src="https://img.shields.io/badge/agents-win_linux_mac-8A2BE2" />
+</p>
 
-
+<p>
 <table align="left">
   <tr>
     <td>

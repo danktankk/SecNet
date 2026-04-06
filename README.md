@@ -5,7 +5,9 @@
   <img src="https://img.shields.io/badge/agents-win_linux_mac-8A2BE2" />
 </p>
 
-# SecNet
+<p align="center">
+  <img src="https://raw.githubusercontent.com/danktankk/discoprowl/main/assets/logo-circular.png" alt="DiscoProwl Icon" height="100" style="vertical-align: left;"/>
+</p>
 
 > Not 100% production ready, but close.  While it is mostly read only, you should always review the code and be mindful of upstream dependencies.
 

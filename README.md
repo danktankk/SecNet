@@ -6,7 +6,7 @@
 </p>
 
 <p align="left">
-  <img src="immages/secnet.png" alt="SecNet">
+  <img src="images/secnet.png" alt="SecNet">
 </p>
 
 > Not 100% production ready, but close.  While it is mostly read only, you should always review the code and be mindful of upstream dependencies.

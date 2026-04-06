@@ -6,8 +6,11 @@
 </p>
 
 <p align="center">
-  <img src="images/secnet.png" width="100"><br><br>
-  <b>SecNet</b>
+  <img src="images/secnet.png" width="120">
+</p>
+
+<p align="center">
+  <strong style="font-size: 2.5em;">SecNet</strong>
 </p>
 
 > Not 100% production ready, but close.  While it is mostly read only, you should always review the code and be mindful of upstream dependencies.

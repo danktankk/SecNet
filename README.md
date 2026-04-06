@@ -11,7 +11,7 @@
       <img src="images/secnet.png" height="100">
     </td>
     <td>
-      <h2>SecNet</h2>
+      <h1>SecNet</h1>
     </td>
   </tr>
 </table>

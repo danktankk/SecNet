@@ -9,6 +9,7 @@
   <img src="images/secnet.png" width="100"><br><br>
   <b>SecNet</b>
 </p>
+
 > Not 100% production ready, but close.  While it is mostly read only, you should always review the code and be mindful of upstream dependencies.
 
 Real-time security and network operations dashboard for homelabs. One screen to monitor everything: firewall bans, network devices, hypervisor health, endpoint status, and event logs.

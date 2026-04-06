@@ -6,11 +6,15 @@
 </p>
 
 <p align="center">
-  <img src="images/secnet.png" width="120">
+  <img src="images/secnet.png" width="140">
 </p>
 
 <p align="center">
-  <strong style="font-size: 2.5em;">SecNet</strong>
+  <strong>SecNet</strong>
+</p>
+
+<p align="center">
+  Real-time security and network operations dashboard for homelabs.
 </p>
 
 > Not 100% production ready, but close.  While it is mostly read only, you should always review the code and be mindful of upstream dependencies.

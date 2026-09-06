@@ -45,8 +45,11 @@ export default function GeoMap({ decisions }) {
   return (
     <div className="map-container">
       <MapContainer center={[20, 0]} zoom={2} style={{ height: '100%', width: '100%' }}
-        scrollWheelZoom={true} attributionControl={false}>
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+        scrollWheelZoom={true} attributionControl={true}>
+        <TileLayer
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+          attribution="Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ"
+        />
         <MapPins decisions={decisions} />
       </MapContainer>
     </div>

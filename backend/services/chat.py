@@ -94,7 +94,7 @@ TOOLS = [
                 "properties": {
                     "updates": {
                         "type": "object",
-                        "description": "Dictionary of .env key names to values to write. Example: {\"PROMETHEUS_URL\": \"http://192.0.2.20:9090\"}",
+                        "description": "Dictionary of .env key names to values to write. Example: {\"PROMETHEUS_URL\": \"http://192.0.2.10:9090\"}",
                         "additionalProperties": {"type": "string"},
                     }
                 },
@@ -209,4 +209,3 @@ async def chat(messages: list[dict], session_unlocked: bool, dashboard_context: 
         temperature=0.7,
     )
     return followup.choices[0].message.content or ""
-
